@@ -310,66 +310,69 @@
                 <button onclick="saveGeneralData()" class="btn">Salvar Dados Gerais</button>
             </div>
 
-            <!-- Aba Alunos -->
-            <div id="students" class="tab-content">
-                <h3>Cadastro de Alunos</h3>
-                <div class="form-grid">
-                    <div class="input-group">
-                        <label>Nome</label>
-                        <input type="text" id="studentName" placeholder="Nome completo">
-                    </div>
-                    <div class="input-group">
-                        <label>RG</label>
-                        <input type="text" id="studentRG" placeholder="000.000.000-0">
-                    </div>
-                    <div class="input-group">
-                        <label>Endereço</label>
-                        <input type="text" id="studentAddress" placeholder="Endereço completo">
-                    </div>
-                    <div class="input-group">
-                        <label>Data de Nascimento</label>
-                        <input type="date" id="studentBirth">
-                    </div>
-                    <div class="input-group">
-                        <label>Idade</label>
-                        <input type="number" id="studentHeight" placeholder="Idade" step="1">
-                    </div>
-                    <div class="input-group">
-                        <label>Categoria</label>
-                        <select id="studentCategory">
-                            <option value="infantil">Infantil</option>
-                            <option value="juvenil">Juvenil</option>
-                            <option value="adulto">Adulto</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label>Faixa Atual</label>
-                        <select id="studentBelt">
-                            <option value="branca">Branca</option>
-                            <option value="cinza">Cinza</option>
-                            <option value="azul">Azul</option>
-                            <option value="amarela">Amarela</option>
-                            <option value="vermelha">Vermelha</option>
-                            <option value="laranja">Laranja</option>
-                            <option value="verde">Verde</option>
-                            <option value="roxa">Roxa</option>
-                            <option value="marrom2">Marrom 2</option>
-                            <option value="marrom1">Marrom 1</option>
-							<option value="marrom1">Preta</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label>Data do Exame da Faixa Atual</label>
-                        <input type="date" id="studentExamDate">
-                    </div>
-                </div>
-                <button onclick="addStudent()" class="btn">Cadastrar Aluno</button>
-                
-                <div class="student-list" id="studentsList">
-                    <h4>Alunos Cadastrados</h4>
-                </div>
-            </div>
+          <!-- Aba Alunos -->
+<div id="students" class="tab-content">
+    <h3>Cadastro de Alunos</h3>
+    <div class="form-grid">
+        <div class="input-group">
+            <label>Nome</label>
+            <input type="text" id="studentName" placeholder="Nome completo">
+        </div>
+        <div class="input-group">
+            <label>RG</label>
+            <input type="text" id="studentRG" placeholder="000.000.000-0">
+        </div>
+        <div class="input-group">
+            <label>Endereço</label>
+            <input type="text" id="studentAddress" placeholder="Endereço completo">
+        </div>
+        <div class="input-group">
+            <label>Telefone</label>
+            <input type="tel" id="studentPhone" placeholder="(00) 00000-0000">
+        </div>
+        <div class="input-group">
+            <label>Data de Nascimento</label>
+            <input type="date" id="studentBirth">
+        </div>
+        <div class="input-group">
+            <label>Idade</label>
+            <input type="number" id="studentHeight" placeholder="Idade" step="1">
+        </div>
+        <div class="input-group">
+            <label>Categoria</label>
+            <select id="studentCategory">
+                <option value="infantil">Infantil</option>
+                <option value="juvenil">Juvenil</option>
+                <option value="adulto">Adulto</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Faixa Atual</label>
+            <select id="studentBelt">
+                <option value="branca">Branca</option>
+                <option value="cinza">Cinza</option>
+                <option value="azul">Azul</option>
+                <option value="amarela">Amarela</option>
+                <option value="vermelha">Vermelha</option>
+                <option value="laranja">Laranja</option>
+                <option value="verde">Verde</option>
+                <option value="roxa">Roxa</option>
+                <option value="marrom2">Marrom 2</option>
+                <option value="marrom1">Marrom 1</option>
+                <option value="preta">Preta</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Data do Exame da Faixa Atual</label>
+            <input type="date" id="studentExamDate">
+        </div>
+    </div>
+    <button onclick="addStudent()" class="btn">Cadastrar Aluno</button>
 
+    <div class="student-list" id="studentsList">
+        <h4>Alunos Cadastrados</h4>
+    </div>
+</div>
             <!-- Aba Presenças -->
             <div id="attendance" class="tab-content">
                 <h3>Controle de Presenças</h3>
