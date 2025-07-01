@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Sistema Karatê - Gerenciamento de Academia</title>
+    <style>
+        /* SEU CSS original vai aqui, mantive apenas parte para não ficar gigante */
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .login-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);}
+        .login-box { background: white; padding: 40px; border-radius: 20px; max-width: 400px; width: 100%; text-align: center; }
+        .btn { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; width: 100%; }
+        .btn:hover { transform: translateY(-2px); }
+        .tab-content { display: none; background: #fff; padding: 30px; border-radius: 15px; margin-top: 20px; }
+        .tab-content.active { display: block; }
+        .nav-tab { background: #fff; border-radius: 10px; padding: 15px 25px; cursor: pointer; margin: 5px; font-weight: bold; }
+        .nav-tab.active { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .student-item { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #667eea; }
+    </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen" class="login-container">
+    <div class="login-box">
+        <h2>Sistema Karatê</h2>
+        <p style="margin-bottom: 30px; color: #666;">Gerenciamento de Academia</p>
+        <form id="loginForm">
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="username" placeholder="Usuário" style="width: 100%; padding: 10px;" required />
+            </div>
+            <div style="margin-bottom: 20px;">
+                <input type="password" id="password" placeholder="Senha" style="width: 100%; padding: 10px;" required />
+            </div>
+            <button type="submit" class="btn">Entrar</button>
+        </form>
+    </div>
+</div>
+
+<!-- Main System -->
+<div id="mainSystem" class="container" style="display: none;">
+    <h1>🥋 Sistema de Karatê</h1>
+    <p id="academyName">Academia de Karatê</p>
+    <button onclick="logout()" class="btn" style="width: auto; margin-bottom: 20px;">Sair</button>
+
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="showTab('general')">Cadastros Gerais</button>
+        <button class="nav-tab" onclick="showTab('students')">Alunos</button>
+    </div>
+
+    <!-- Cadastros Gerais -->
+    <div id="general" class="tab-content active">
+        <h3>Dados da Academia</h3>
+        <div class="form-grid">
+            <div>
+                <label>Nome da Academia</label>
+                <input type="text" id="academyNameInput" style="width:100%; padding: 10px;"/>
+            </div>
+            <div>
+                <label>CNPJ</label>
+                <input type="text" id="cnpj" style="width:100%; padding: 10px;"/>
+            </div>
+            <div>
+                <label>Logo</label>
+                <input type="file" id="academyLogo"/>
+            </div>
+        </div>
+        <button onclick="saveGeneralData()" class="btn" style="margin-top: 20px;">Salvar Dados Gerais</button>
+    </div>
+
+    <!-- Alunos -->
+    <div id="students" class="tab-content">
+        <h3>Cadastro de Alunos</h3>
+        <div class="form-grid">
+            <div><label>Nome</label><input type="text" id="studentName" style="width:100%; padding:10px;"></div>
+            <div><label>RG</label><input type="text" id="studentRG" style="width:100%; padding:10px;"></div>
+            <div><label>Endereço</label><input type="text" id="studentAddress" style="width:100%; padding:10px;"></div>
+            <div><label>Data de Nascimento</label><input type="date" id="studentBirth" style="width:100%; padding:10px;"></div>
+            <div><label>Altura (cm)</label><input type="number" id="studentHeight" style="width:100%; padding:10px;"></div>
+            <div><label>Categoria</label>
+                <select id="studentCategory" style="width:100%; padding:10px;">
+                    <option value="infantil">Infantil</option>
+                    <option value="juvenil">Juvenil</option>
+                    <option value="adulto">Adulto</option>
+                </select>
+            </div>
+            <div><label>Faixa Atual</label>
+                <select id="studentBelt" style="width:100%; padding:10px;">
+                    <option value="branca">Branca</option>
+                    <option value="cinza">Cinza</option>
+                    <option value="azul">Azul</option>
+                    <option value="amarela">Amarela</option>
+                    <option value="vermelha">Vermelha</option>
+                    <option value="laranja">Laranja</option>
+                    <option value="verde">Verde</option>
+                    <option value="roxa">Roxa</option>
+                    <option value="marrom2">Marrom 2</option>
+                    <option value="marrom1">Marrom 1</option>
+                </select>
+            </div>
+            <div><label>Data do Exame da Faixa Atual</label><input type="date" id="studentExamDate" style="width:100%; padding:10px;"></div>
+        </div>
+        <button onclick="addStudent()" class="btn" style="margin-top: 20px;">Cadastrar Aluno</button>
+        <div id="studentsList" style="margin-top: 30px;"></div>
+    </div>
+</div>
+
+<script>
+    // Login
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        if (username === 'admin' && password === 'karate123') {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainSystem').style.display = 'block';
+            loadSystemData();
+        } else {
+            alert('Usuário ou senha incorretos!');
+        }
+    });
+
+    function logout() {
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('mainSystem').style.display = 'none';
+    }
+
+    function showTab(tabName) {
+        document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById(tabName).classList.add('active');
+    }
+
+    function saveGeneralData() {
+        const data = {
+            name: document.getElementById('academyNameInput').value,
+            cnpj: document.getElementById('cnpj').value,
+            logo: document.getElementById('academyLogo').files[0]?.name || ''
+        };
+
+        fetch("http://127.0.0.1:5000/academia", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            alert(res.message);
+            document.getElementById('academyName').textContent = data.name || "Academia de Karatê";
+        });
+    }
+
+    function loadSystemData() {
+        fetch("http://127.0.0.1:5000/academia")
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.name) {
+                    document.getElementById('academyName').textContent = data.name;
+                    document.getElementById('academyNameInput').value = data.name;
+                    document.getElementById('cnpj').value = data.cnpj || "";
+                }
+            });
+
+        fetch("http://127.0.0.1:5000/alunos")
+            .then(r => r.json())
+            .then(alunos => {
+                systemData.students = alunos;
+                updateStudentsList();
+            });
+    }
+
+    function addStudent() {
+        const student = {
+            id: Date.now(),
+            name: document.getElementById('studentName').value,
+            rg: document.getElementById('studentRG').value,
+            address: document.getElementById('studentAddress').value,
+            birth: document.getElementById('studentBirth').value,
+            height: document.getElementById('studentHeight').value,
+            category: document.getElementById('studentCategory').value,
+            belt: document.getElementById('studentBelt').value,
+            examDate: document.getElementById('studentExamDate').value
+        };
+
+        if (!student.name || !student.rg || !student.birth) {
+            alert('Preencha todos os campos obrigatórios!');
+            return;
+        }
+
+        fetch("http://127.0.0.1:5000/alunos", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(student)
+        })
+        .then(r => r.json())
+        .then(res => {
+            alert(res.message);
+            clearStudentForm();
+            loadSystemData();
+        });
+    }
+
+    function clearStudentForm() {
+        document.getElementById('studentName').value = '';
+        document.getElementById('studentRG').value = '';
+        document.getElementById('studentAddress').value = '';
+        document.getElementById('studentBirth').value = '';
+        document.getElementById('studentHeight').value = '';
+        document.getElementById('studentCategory').value = 'infantil';
+        document.getElementById('studentBelt').value = 'branca';
+        document.getElementById('studentExamDate').value = '';
+    }
+
+    function updateStudentsList() {
+        const list = document.getElementById('studentsList');
+        list.innerHTML = '<h4>Alunos Cadastrados</h4>';
+        if (systemData.students && systemData.students.length > 0) {
+            systemData.students.forEach(stu => {
+                const div = document.createElement('div');
+                div.className = 'student-item';
+                div.innerHTML = `<strong>${stu.name}</strong><br>
+                                 RG: ${stu.rg}<br>
+                                 Faixa: ${stu.belt}<br>
+                                 Nascimento: ${new Date(stu.birth).toLocaleDateString('pt-BR')}`;
+                list.appendChild(div);
+            });
+        }
+    }
+
+    const systemData = { students: [] };
+</script>
+
+</body>
+</html>
