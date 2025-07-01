@@ -79,6 +79,7 @@ function addStudent() {
         name: document.getElementById('studentName').value,
         rg: document.getElementById('studentRG').value,
         address: document.getElementById('studentAddress').value,
+        phone: document.getElementById('studentPhone').value, 
         birth: document.getElementById('studentBirth').value,
         height: document.getElementById('studentHeight').value,
         category: document.getElementById('studentCategory').value,
