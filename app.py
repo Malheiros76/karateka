@@ -263,7 +263,7 @@ def exportar_pdf_equipamentos():
 # ---------- PÁGINAS ----------
 
 def criar_admin():
-    st.title("🥋 空手道 (Karatedō) - Primeiro Acesso")
+    st.title("🥋 空手道 (Karatedō) - Primeiro Acesso - By Malheiros")
     st.info("Nenhum usuário encontrado. Crie o usuário administrador.")
 
     usuario = st.text_input("Usuário Admin")
@@ -291,7 +291,7 @@ def criar_admin():
         st.rerun()
 
 def login():
-    st.title("🥋 空手道 (Karatedō) - Sistema Karatê")
+    st.title("🥋 空手道 (Karatedō) - Sistema Karatê -By Malheiros")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
     if st.button("Entrar"):
