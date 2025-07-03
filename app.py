@@ -114,6 +114,8 @@ def verificar_login(usuario, senha):
         return True
     return False
 
+usuario_eh_user = st.session_state["nivel"] == "user"
+
 def cadastrar_usuario(usuario, senha):
     if col_usuarios.find_one({"usuario": usuario}):
         return False
@@ -288,7 +290,7 @@ def criar_admin():
     senha = st.text_input("Senha", type="password")
     confirmar = st.text_input("Confirme a Senha", type="password")
 
-    if st.button("Criar Admin"):
+    if st.button("Criar Admin", disabled=usuario_eh_user):
         if senha != confirmar:
             st.error("As senhas não coincidem.")
             return
@@ -339,7 +341,7 @@ def pagina_geral():
         cnpj = st.text_input("CNPJ", value=dados.get("cnpj") if dados else "")
         logo = st.file_uploader("Logo da Academia", type=["png","jpg","jpeg"])
 
-        if st.form_submit_button("Salvar Dados Gerais"):
+        if st.form_submit_button("Salvar Dados Gerais", disabled=usuario_eh_user):
             logo_url = None
             if logo:
                 logo_path = f"logo_academia.{logo.type.split('/')[-1]}"
@@ -367,11 +369,11 @@ def pagina_alunos():
                 st.markdown(f"**{a['nome']}** | RG: {a.get('rg','')} | Faixa: {a.get('faixa','')} | Tel: {a.get('telefone','')}")
             with col2:
                 # Botão para editar
-                if st.button(f"✏️ Editar {a['nome']}", key=f"editar_{a['_id']}"):
+                if st.button(f"✏️ Editar {a['nome']}", key=f"editar_{a['_id']}", disabled=usuario_eh_user):
                     st.session_state["editar_id"] = str(a["_id"])
-                    st.experimental_rerun()
+                    st.rerun()
             with col3:
-                if st.button(f"🗑️ Excluir {a['nome']}", key=f"excluir_{a['_id']}"):
+                if st.button(f"🗑️ Excluir {a['nome']}", key=f"excluir_{a['_id']}", disabled=usuario_eh_user):
                     col_alunos.delete_one({"_id": a["_id"]})
                     st.success(f"Aluno {a['nome']} excluído!")
                     st.rerun()
@@ -389,7 +391,7 @@ def pagina_alunos():
             data_nascimento = st.date_input("Data de Nascimento", value=datetime.strptime(aluno_edit.get("data_nascimento", "2000-01-01"), "%Y-%m-%d"))
             telefone = st.text_input("Telefone/WhatsApp (com DDD)", value=aluno_edit.get("telefone",""))
 
-            if st.form_submit_button("Salvar Alterações"):
+            if st.form_submit_button("Salvar Alterações", disabled=usuario_eh_user):
                 col_alunos.update_one(
                     {"_id": ObjectId(editar_id)},
                     {"$set": {
@@ -404,7 +406,7 @@ def pagina_alunos():
                 del st.session_state["editar_id"]
                 st.rerun()
 
-        if st.button("Cancelar edição"):
+        if st.button("Cancelar edição", disabled=usuario_eh_user):
             del st.session_state["editar_id"]
             st.rerun()
 
@@ -430,35 +432,76 @@ def pagina_alunos():
 
 from datetime import datetime, timedelta
 
+import pandas as pd
+import calendar
+
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
-    hoje = datetime.today().strftime("%Y-%m-%d")
-    presenca = col_presencas.find_one({"data": hoje})
+    # --- Selecionar mês e ano ---
+    hoje = datetime.today()
+    col1, col2 = st.columns(2)
+    with col1:
+        ano_sel = st.selectbox("Ano", list(range(2020, hoje.year + 2)), index=list(range(2020, hoje.year + 2)).index(hoje.year))
+    with col2:
+        mes_sel = st.selectbox("Mês", list(calendar.month_name)[1:], index=hoje.month - 1)
 
-    st.subheader("Presenças Hoje")
-    if presenca and presenca.get("presentes"):
-        for nome in presenca["presentes"]:
-            st.markdown(f"✅ {nome}")
-    else:
-        st.info("Nenhuma presença registrada hoje.")
+    # Gera datas do mês escolhido
+    num_dias = calendar.monthrange(ano_sel, list(calendar.month_name).index(mes_sel))[1]
+    dias_do_mes = [datetime(ano_sel, list(calendar.month_name).index(mes_sel), dia).strftime("%Y-%m-%d") for dia in range(1, num_dias + 1)]
 
-    st.header("🥋 空手道 (Karatedō) - Registrar Presença")
+    # Buscar todos registros do mês no banco
+    registros = list(col_presencas.find({"data": {"$gte": dias_do_mes[0], "$lte": dias_do_mes[-1]}}))
+
+    # Montar dicionário { data : [alunos presentes] }
+    mapa_presencas = {}
+    for r in registros:
+        mapa_presencas[r["data"]] = r.get("presentes", [])
+
+    # Todos alunos
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
-    with st.form("form_presenca"):
-        presentes = st.multiselect("Selecione os alunos presentes", nomes_alunos)
-        if st.form_submit_button("Registrar"):
-            if presenca:
-                col_presencas.update_one({"_id": presenca["_id"]}, {"$set": {"presentes": presentes}})
-            else:
-                col_presencas.insert_one({"data": hoje, "presentes": presentes})
-            st.success("Presença registrada!")
-            st.rerun()
+
+    # Construir matriz de presenças
+    matriz = []
+    for dia in dias_do_mes:
+        linha = {"Dia": dia}
+        presentes = mapa_presencas.get(dia, [])
+        for nome in nomes_alunos:
+            linha[nome] = "X" if nome in presentes else ""
+        matriz.append(linha)
+
+    df = pd.DataFrame(matriz)
+
+    st.subheader(f"Grade de Presenças - {mes_sel}/{ano_sel}")
+    if df.empty:
+        st.info("Nenhuma presença registrada nesse mês.")
+    else:
+        st.dataframe(df, use_container_width=True)
+
+    st.markdown("---")
+    
+    # Registrar presenças do dia de hoje
+    st.header("🥋 空手道 (Karatedō) - Registrar Presença")
+
+    hoje_str = hoje.strftime("%Y-%m-%d")
+    presenca_hoje = col_presencas.find_one({"data": hoje_str})
+    if presenca_hoje and presenca_hoje.get("presentes"):
+        st.info(f"Presenças já registradas para hoje ({hoje_str}).")
+        st.markdown(", ".join(presenca_hoje["presentes"]))
+    else:
+        with st.form("form_presenca"):
+            nomes_alunos = [a["nome"] for a in alunos]
+            presentes = st.multiselect("Selecione os alunos presentes", nomes_alunos)
+            if st.form_submit_button("Registrar", disabled=usuario_eh_user):
+                col_presencas.insert_one({"data": hoje_str, "presentes": presentes})
+                st.success("Presença registrada!")
+                st.rerun()
 
     if st.button("Exportar PDF de Presenças"):
         pdf_bytes = exportar_pdf_presencas()
         st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
+
 
 def pagina_mensalidades():
     st.header("🥋 空手道 (Karatedō) - Mensalidades Registradas")
@@ -486,7 +529,7 @@ def pagina_mensalidades():
             prox_venc = hoje.replace(year=ano, month=mes, day=5)
         vencimento = st.date_input("Data de Vencimento", value=prox_venc)
         pago = st.checkbox("Pago?")
-        if st.form_submit_button("Registrar"):
+        if st.form_submit_button("Registrar", disabled=usuario_eh_user):
             col_mensalidades.insert_one({
                 "aluno": aluno,
                 "vencimento": str(vencimento),
@@ -549,7 +592,7 @@ def pagina_exames():
         data = st.date_input("Data do Exame")
         faixa = st.selectbox("Faixa", list(belt_progression.keys()))
         status = st.selectbox("Status", ["Aprovado", "Reprovado"])
-        if st.form_submit_button("Registrar"):
+        if st.form_submit_button("Registrar", disabled=usuario_eh_user):
             col_exames.insert_one({
                 "aluno": aluno,
                 "data": str(data),
@@ -559,9 +602,9 @@ def pagina_exames():
             st.success("Exame registrado!")
             st.rerun()
 
-    if st.button("Exportar PDF de Exames"):
+    if st.button("Exportar PDF de Exames", disabled=usuario_eh_user):
         pdf_bytes = exportar_pdf_exames()
-        st.download_button("Baixar PDF", pdf_bytes, "exames.pdf", "application/pdf")
+        st.download_button("Baixar PDF", pdf_bytes, "exames.pdf", "application/pdf", disabled=usuario_eh_user)
 
 def pagina_equipamentos():
     st.header("🥋 空手道 (Karatedō) - 🎽 Equipamentos")
@@ -575,7 +618,7 @@ def pagina_equipamentos():
     with st.form("form_equipamento"):
         nome = st.text_input("Nome do Equipamento")
         quantidade = st.number_input("Quantidade", min_value=0, step=1)
-        if st.form_submit_button("Adicionar"):
+        if st.form_submit_button("Adicionar", disabled=usuario_eh_user):
             if nome:
                 col_equipamentos.insert_one({"nome": nome, "quantidade": quantidade})
                 st.success("Equipamento adicionado!")
@@ -607,7 +650,7 @@ def pagina_emprestimos():
                 cor_faixa = st.selectbox("Cor da Faixa", 
                     ["Branca", "Cinza", "Azul", "Amarela", "Vermelha", "Laranja", "Verde", "Roxa", "Marrom", "Preta"])
 
-        if st.button("Cadastrar Equipamento"):
+        if st.button("Cadastrar Equipamento", disabled=usuario_eh_user):
             # Validar campos
             if not codigo.strip():
                 st.error("Informe o código do equipamento.")
@@ -651,7 +694,7 @@ def pagina_emprestimos():
         data_devolucao = st.date_input("Data de Devolução Prevista", value=datetime.today() + timedelta(days=7))
         observacoes = st.text_input("Observações")
 
-        if st.button("Registrar Empréstimo"):
+        if st.button("Registrar Empréstimo", disabled=usuario_eh_user):
             if not aluno_sel:
                 st.error("Selecione um aluno.")
             elif not equipamento_sel:
@@ -677,7 +720,7 @@ def pagina_emprestimos():
                         "devolvido": False,
                     })
                     st.success("Empréstimo registrado com sucesso!")
-                    st.experimental_rerun()
+                    st.rerun()
 
     st.markdown("---")
 
@@ -699,10 +742,10 @@ def pagina_emprestimos():
                     f"**Observações:** {emp.get('observacoes','')}"
                 )
             with col2:
-                if st.button(f"Registrar Devolução - {emp['aluno']} - {emp['equipamento']}", key=f"dev_{emp['_id']}"):
+                if st.button(f"Registrar Devolução - {emp['aluno']} - {emp['equipamento']}", key=f"dev_{emp['_id']}", disabled=usuario_eh_user):
                     col_emprestimos.update_one({"_id": emp["_id"]}, {"$set": {"devolvido": True}})
                     st.success(f"Devolução registrada para {emp['aluno']}.")
-                    st.experimental_rerun()
+                    st.rerun()
 
     st.markdown("---")
 
@@ -754,7 +797,7 @@ def pagina_admin_system():
     confirmar = st.text_input("Confirme a Senha", type="password")
     nivel = st.selectbox("Nível", ["admin", "user"])
 
-    if st.button("Criar Usuário"):
+    if st.button("Criar Usuário", disabled=usuario_eh_user):
         if not usuario or not senha:
             st.error("Preencha todos os campos.")
         elif senha != confirmar:
