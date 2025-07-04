@@ -9,6 +9,9 @@ from dateutil.relativedelta import relativedelta
 import urllib.parse
 from datetime import datetime, timedelta
 import bcrypt
+import pandas as pd
+from datetime import datetime
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # --- Inicialização segura do session_state ---
 
@@ -514,12 +517,8 @@ def pagina_mensalidades():
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
     
-    def pagina_grade_presenca():
-        st.subheader("🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
-
-    from datetime import datetime
-    import pandas as pd
-    from st_aggrid import AgGrid, GridOptionsBuilder
+   def pagina_grade_presenca():
+    st.subheader("🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -541,12 +540,15 @@ def pagina_mensalidades():
         proximo_mes = datetime(ano, mes + 1, 1)
     dias_mes = pd.date_range(start=primeiro_dia, end=proximo_mes - pd.Timedelta(days=1))
 
+    # Buscar alunos ativos
     alunos_ativos = list(col_alunos.find({"ativo": True}, {"_id": 0, "nome": 1}))
     nomes_ativos = [a["nome"] for a in alunos_ativos]
 
+    # Buscar todas as presenças
     todas_presencas = list(col_presencas.find({}, {"_id": 0, "nome": 1, "data": 1}))
     df_presencas = pd.DataFrame(todas_presencas)
 
+    # Filtra as presenças do mês/ano
     if not df_presencas.empty:
         df_presencas["data"] = pd.to_datetime(df_presencas["data"], errors='coerce')
         df_presencas = df_presencas[
@@ -556,16 +558,19 @@ def pagina_mensalidades():
     else:
         df_presencas = pd.DataFrame(columns=["nome", "data"])
 
+    # Cria grade
     grid_data = pd.DataFrame({"Aluno": nomes_ativos})
     for dia in dias_mes:
         grid_data[dia.day] = ""
 
+    # Marca presença com "X"
     for _, row in df_presencas.iterrows():
         nome = row["nome"]
         data = row["data"]
-        if nome in nomes_ativos:
+        if nome in nomes_ativos and not pd.isna(data):
             grid_data.loc[grid_data["Aluno"] == nome, data.day] = "X"
 
+    # Configura grid
     gb = GridOptionsBuilder.from_dataframe(grid_data)
     gb.configure_default_column(resizable=True, width=40)
     gb.configure_grid_options(domLayout='normal')
@@ -893,11 +898,12 @@ else:
     col1, col2 = st.columns([8, 1])
     with col1:
         pagina = st.radio(
-            "Menu",
-            ["Alunos", "Presenças", "Grade de Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais","Sistema"],
-            horizontal=True,
-            label_visibility="collapsed"
+           "Menu",
+           ["Alunos", "Presenças", "Grade de Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais", "Sistema"],
+           horizontal=True,
+           label_visibility="collapsed"
         )
+
         def logout():
             st.session_state.logado = False
             st.rerun()
@@ -908,21 +914,21 @@ else:
             
     # Exibe a página selecionada
     if pagina == "Alunos":
-        pagina_alunos()
+    pagina_alunos()
     elif pagina == "Presenças":
-        pagina_presencas()
+    pagina_presencas()
     elif pagina == "Grade de Presenças":
-        pagina_grade_presenca()
+    pagina_grade_presenca()
     elif pagina == "Mensalidades":
-        pagina_mensalidades()
-        enviar_alerta_mensalidade()
+    pagina_mensalidades()
+    enviar_alerta_mensalidade()
     elif pagina == "Exames":
-        pagina_exames()
+    pagina_exames()
     elif pagina == "Empréstimos":
-        pagina_emprestimos()
+    pagina_emprestimos()
     elif pagina == "Equipamentos":
-        pagina_equipamentos()
+    pagina_equipamentos()
     elif pagina == "Cadastros Gerais":
-        pagina_geral()
+    pagina_geral()
     elif pagina == "Sistema":
-        pagina_admin_system()
+    pagina_admin_system()
