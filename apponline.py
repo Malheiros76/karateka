@@ -516,7 +516,7 @@ def pagina_mensalidades():
                 st.rerun()
     
             if st.button("Exportar PDF de Mensalidades"):
-            pdf_bytes = exportar_pdf_mensalidades()
+                pdf_bytes = exportar_pdf_mensalidades()
             st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
                 
 def pagina_grade_presenca():
