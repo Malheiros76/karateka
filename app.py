@@ -100,23 +100,59 @@ def enviar_mensagem_whatsapp(telefone, mensagem):
 
 def enviar_alerta_mensalidade():
     hoje = datetime.today().date()
-    mensalidades = list(col_mensalidades.find({}))
-    alerta_3_dias = hoje + timedelta(days=3)
-
+    
+    # Data fixa de vencimento: dia 5 do mês atual
+    vencimento_fixo = hoje.replace(day=5)
+    
+    # Se hoje passou do dia 5, verifica vencimento do próximo mês
+    if hoje.day > 5:
+        mes = 1 if hoje.month == 12 else hoje.month + 1
+        ano = hoje.year + (1 if hoje.month == 12 else 0)
+        vencimento_fixo = vencimento_fixo.replace(year=ano, month=mes)
+    
+    # Define as datas para os alertas
+    datas_alerta = {
+        3: vencimento_fixo - timedelta(days=3),
+        2: vencimento_fixo - timedelta(days=2),
+        1: vencimento_fixo - timedelta(days=1),
+    }
+    
+    # Busca mensalidades não pagas
+    mensalidades = list(col_mensalidades.find({"pago": False}))
+    
     for mensalidade in mensalidades:
+        aluno_nome = mensalidade['aluno']
+        
+        aluno_doc = col_alunos.find_one({"nome": aluno_nome})
+        if not aluno_doc:
+            continue
+
+        telefone = aluno_doc.get("telefone")
+        if not telefone:
+            continue
+
         try:
             vencimento = datetime.strptime(mensalidade['vencimento'], "%Y-%m-%d").date()
         except:
             continue
 
-        if vencimento == alerta_3_dias:
-            aluno = col_alunos.find_one({"nome": mensalidade['aluno']})
-            if aluno:
-                telefone = aluno.get("telefone", "")
-                nome = aluno.get("nome")
-                if telefone:
-                    mensagem = f"Olá {nome}, sua mensalidade vence em 3 dias ({vencimento.strftime('%d/%m/%Y')}). Por favor, realize o pagamento para evitar suspensão das aulas."
-                    enviar_mensagem_whatsapp(telefone, mensagem)
+        # Verifica alertas por data
+        dias_restantes = (vencimento - hoje).days
+
+        if dias_restantes in datas_alerta:
+            mensagem = (
+                f"Olá {aluno_nome}, sua mensalidade vence em {dias_restantes} dia(s) "
+                f"({vencimento.strftime('%d/%m/%Y')}). "
+                f"Por favor, realize o pagamento para evitar suspensão das aulas."
+            )
+            enviar_mensagem_whatsapp(telefone, mensagem)
+
+        elif dias_restantes < 0:
+            mensagem = (
+                f"⚠️ Olá {aluno_nome}, sua mensalidade venceu no dia "
+                f"{vencimento.strftime('%d/%m/%Y')}. Regularize o pagamento o quanto antes para evitar restrições às aulas."
+            )
+            enviar_mensagem_whatsapp(telefone, mensagem)
 
 def hash_password(password):
     import hashlib
@@ -441,6 +477,7 @@ def pagina_presencas():
 
 def pagina_mensalidades():
     st.header("🥋 空手道 (Karatedō) - Mensalidades Registradas")
+        enviar_alerta_mensalidade()
     mensalidades = list(col_mensalidades.find().sort("vencimento", -1))
     if mensalidades:
         for m in mensalidades:
