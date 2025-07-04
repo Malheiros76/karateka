@@ -912,7 +912,7 @@ else:
     elif pagina == "Presenças":
         pagina_presencas()
     elif pagina == "Grade de Presenças":
-        pagina_grade_presenca()  
+        pagina_grade_presenca()
     elif pagina == "Mensalidades":
         pagina_mensalidades()
         enviar_alerta_mensalidade()
