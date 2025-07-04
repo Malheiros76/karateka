@@ -514,61 +514,65 @@ def pagina_mensalidades():
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
 
-# --- ABA GRADE DE PRESENÇAS ---
-elif menu == "Grade de Presenças":
+def pagina_grade_presencas():
     st.subheader("📅 Grade de Presenças")
 
-    import pandas as pd
     from datetime import datetime
+    import pandas as pd
     from st_aggrid import AgGrid, GridOptionsBuilder
 
-    # --- SELECIONAR MÊS E ANO ---
     col1, col2 = st.columns(2)
     with col1:
-        mes = st.selectbox("Selecione o mês", list(range(1, 13)), format_func=lambda x: datetime(2000, x, 1).strftime("%B"))
+        mes = st.selectbox(
+            "Selecione o mês",
+            list(range(1, 13)),
+            format_func=lambda x: datetime(2000, x, 1).strftime("%B")
+        )
     with col2:
-        ano = st.selectbox("Selecione o ano", list(range(2023, datetime.now().year + 1)))
+        ano = st.selectbox(
+            "Selecione o ano",
+            list(range(2023, datetime.now().year + 1))
+        )
 
-    # --- GERA LISTA DE DIAS DO MÊS ---
-    dias_mes = pd.date_range(start=f"{ano}-{mes:02d}-01", end=f"{ano}-{mes:02d}-28", freq='D')
-    while dias_mes[-1].month == mes:
-        dias_mes = pd.date_range(start=f"{ano}-{mes:02d}-01", periods=len(dias_mes)+1, freq='D')
+    primeiro_dia = datetime(ano, mes, 1)
+    if mes == 12:
+        proximo_mes = datetime(ano + 1, 1, 1)
+    else:
+        proximo_mes = datetime(ano, mes + 1, 1)
+    dias_mes = pd.date_range(start=primeiro_dia, end=proximo_mes - pd.Timedelta(days=1))
 
-    dias_mes = dias_mes[dias_mes.month == mes]  # Remove dias do mês seguinte
-
-    # --- OBTÉM ALUNOS ATIVOS ---
     alunos_ativos = list(col_alunos.find({"ativo": True}, {"_id": 0, "nome": 1}))
     nomes_ativos = [a["nome"] for a in alunos_ativos]
 
-    # --- OBTÉM PRESENÇAS DO MÊS ESCOLHIDO ---
     todas_presencas = list(col_presencas.find({}, {"_id": 0, "nome": 1, "data": 1}))
     df_presencas = pd.DataFrame(todas_presencas)
 
     if not df_presencas.empty:
         df_presencas["data"] = pd.to_datetime(df_presencas["data"], errors='coerce')
-        df_presencas = df_presencas[(df_presencas["data"].dt.month == mes) & (df_presencas["data"].dt.year == ano)]
+        df_presencas = df_presencas[
+            (df_presencas["data"].dt.month == mes) &
+            (df_presencas["data"].dt.year == ano)
+        ]
     else:
         df_presencas = pd.DataFrame(columns=["nome", "data"])
 
-    # --- CRIA GRADE VAZIA ---
     grid_data = pd.DataFrame({"Aluno": nomes_ativos})
     for dia in dias_mes:
-        grid_data[dia.day] = ""  # Inicializa células vazias
+        grid_data[dia.day] = ""
 
-    # --- MARCA PRESENÇAS COM X ---
     for _, row in df_presencas.iterrows():
         nome = row["nome"]
         data = row["data"]
         if nome in nomes_ativos:
             grid_data.loc[grid_data["Aluno"] == nome, data.day] = "X"
 
-    # --- MOSTRA A GRADE COM AgGrid ---
     gb = GridOptionsBuilder.from_dataframe(grid_data)
     gb.configure_default_column(resizable=True, width=40)
     gb.configure_grid_options(domLayout='normal')
     gridOptions = gb.build()
 
     st.info(f"Grade de presenças para **{datetime(ano, mes, 1).strftime('%B/%Y')}**")
+
     AgGrid(grid_data, gridOptions=gridOptions, fit_columns_on_grid_load=True)
 
 def pagina_exames():
@@ -890,7 +894,7 @@ else:
     with col1:
         pagina = st.radio(
             "Menu",
-            ["Alunos", "Presenças", "Mensalidades", "Exames","Empréstimos", "Equipamentos", "Cadastros Gerais","Sistema"],
+            ["Alunos", "Presenças", "Grade de Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais","Sistema"],
             horizontal=True,
             label_visibility="collapsed"
         )
@@ -907,6 +911,8 @@ else:
         pagina_alunos()
     elif pagina == "Presenças":
         pagina_presencas()
+    elif pagina == "Grade de Presenças":
+        pagina_grade_presença()  
     elif pagina == "Mensalidades":
         pagina_mensalidades()
         enviar_alerta_mensalidade()
