@@ -490,7 +490,7 @@ def pagina_mensalidades():
     else:
         st.info("Nenhuma mensalidade registrada.")
 
-    st.header("🥋 空手道 (Karatedō) - Registrar Mensalidade")
+st.header("🥋 空手道 (Karatedō) - Registrar Mensalidade")
     with st.form("form_mensalidade"):
         alunos = list(col_alunos.find())
         aluno_nomes = [a["nome"] for a in alunos]
