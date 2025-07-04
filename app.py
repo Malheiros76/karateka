@@ -515,7 +515,7 @@ def pagina_mensalidades():
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
     
     def pagina_grade_presenca():
-    st.subheader(""🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
+    st.subheader("🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
 
     from datetime import datetime
     import pandas as pd
