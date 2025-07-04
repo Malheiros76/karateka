@@ -406,7 +406,7 @@ def pagina_alunos():
             nome = st.text_input("Nome", value=aluno_edit["nome"])
             rg = st.text_input("RG", value=aluno_edit.get("rg", ""))
             faixa = st.selectbox("Faixa", ["Branca", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"], index=["Branca", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"].index(aluno_edit.get("faixa","Branca")))
-            data_nascimento = st.date_input("Data de Nascimento", value=datetime.strptime(aluno_edit.get("data_nascimento", "2000-01-01"), "%Y-%m-%d"))
+            data_nascimento = st.date_input("Data de Nascimento", value=datetime.strptime(aluno_edit.get("data_nascimento", "1900-01-01"), "%Y-%m-%d"))
             telefone = st.text_input("Telefone/WhatsApp (com DDD)", value=aluno_edit.get("telefone",""))
 
             if st.form_submit_button("Salvar Alterações"):
