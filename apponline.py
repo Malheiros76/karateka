@@ -489,23 +489,28 @@ def pagina_mensalidades():
             st.markdown(f"📌 {m['aluno']} | Vencimento: {m['vencimento']} | Pago: {pago}")
     else:
         st.info("Nenhuma mensalidade registrada.")
+
     st.header("🥋 空手道 (Karatedō) - Registrar Mensalidade")
     with st.form("form_mensalidade"):
         alunos = list(col_alunos.find())
-        aluno_nomes = [a["nome"] for a in alunos]
-        aluno = st.selectbox("Aluno", aluno_nomes)
-        # calcula o próximo dia 5
+        aluno_nomes = [a["nome"] for a in alunos] if alunos else []
+        aluno = st.selectbox("Aluno", aluno_nomes) if aluno_nomes else None
+
+        # calcula o próximo dia 5
         hoje = datetime.today().date()
         if hoje.day <= 5:
-           prox_venc = hoje.replace(day=5)
+            prox_venc = hoje.replace(day=5)
         else:
-        # pula para o mês seguinte
+            # pula para o mês seguinte
             ano = hoje.year + (1 if hoje.month == 12 else 0)
             mes = 1 if hoje.month == 12 else hoje.month + 1
             prox_venc = hoje.replace(year=ano, month=mes, day=5)
-            vencimento = st.date_input("Data de Vencimento", value=prox_venc)
-            pago = st.checkbox("Pago?")
+
+        vencimento = st.date_input("Data de Vencimento", value=prox_venc)
+        pago = st.checkbox("Pago?")
+
         if st.form_submit_button("Registrar"):
+            if aluno:
                 col_mensalidades.insert_one({
                     "aluno": aluno,
                     "vencimento": str(vencimento),
@@ -513,11 +518,13 @@ def pagina_mensalidades():
                 })
                 st.success("Mensalidade registrada!")
                 st.rerun()
-    
-     if st.button("Exportar PDF de Mensalidades"):
-                pdf_bytes = exportar_pdf_mensalidades()
-            st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-                
+            else:
+                st.warning("Nenhum aluno cadastrado para registrar mensalidade.")
+
+    if st.button("Exportar PDF de Mensalidades"):
+        pdf_bytes = exportar_pdf_mensalidades()
+        st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
+               
 def pagina_grade_presenca():
     st.subheader("🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
     from datetime import datetime, timedelta
