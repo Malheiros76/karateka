@@ -14,8 +14,6 @@ import pandas as pd
 from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
 
-
-
 # --- Inicialização segura do session_state ---
 
 if "logado" not in st.session_state:
