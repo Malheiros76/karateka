@@ -1,5 +1,6 @@
 import streamlit as st
 from pymongo import MongoClient
+from datetime import datetime
 from bson.objectid import ObjectId
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -8,47 +9,29 @@ import io
 from dateutil.relativedelta import relativedelta
 import urllib.parse
 from datetime import datetime, timedelta
+import bcrypt
+import pandas as pd
+from datetime import datetime
+from st_aggrid import AgGrid, GridOptionsBuilder
 
-belt_progression = {
-    'Branca': {'next': 'Cinza', 'months': 3, 'value': 40.00},
-    'Cinza': {'next': 'Azul', 'months': 3, 'value': 45.00},
-    'Azul': {'next': 'Amarela', 'months': 3, 'value': 55.00},
-    'Amarela': {'next': 'Vermelha', 'months': 3, 'value': 60.00},
-    'Vermelha': {'next': 'Laranja', 'months': 6, 'value': 65.00},
-    'Laranja': {'next': 'Verde', 'months': 9, 'value': 70.00},
-    'Verde': {'next': 'Roxa', 'months': 9, 'value': 75.00},
-    'Roxa': {'next': 'Marrom2', 'months': 12, 'value': 80.00},
-    'Marrom2': {'next': 'Marrom1', 'months': 12, 'value': 90.00}
-}
 
-# --- Funções auxiliares ---
-def enviar_mensagem_whatsapp(telefone, mensagem):
-    numero = telefone.replace("(", "").replace(")", "").replace("-", "").replace(" ", "")
-    texto = urllib.parse.quote(mensagem)
-    url = f"https://api.whatsapp.com/send?phone=55{numero}&text={texto}"
-    st.markdown(f"[Clique aqui para enviar mensagem via WhatsApp]({url})", unsafe_allow_html=True)
 
-def enviar_alerta_mensalidade():
-    hoje = datetime.today().date()
-    alerta_3_dias = hoje + timedelta(days=3)
+# --- Inicialização segura do session_state ---
 
-    mensalidades = list(col_mensalidades.find({}))
-    for mensalidade in mensalidades:
-        try:
-            vencimento = datetime.strptime(mensalidade['vencimento'], "%Y-%m-%d").date()
-        except:
-            continue
+if "logado" not in st.session_state:
+    st.session_state["logado"] = False
 
-        if vencimento == alerta_3_dias:
-            aluno = col_alunos.find_one({"nome": mensalidade['aluno']})
-            if aluno:
-                telefone = aluno.get("telefone", "")
-                nome = aluno.get("nome")
-                if telefone:
-                    mensagem = f"Olá {nome}, sua mensalidade vence em 3 dias ({vencimento.strftime('%d/%m/%Y')}). Por favor, realize o pagamento para evitar suspensão das aulas."
-                    enviar_mensagem_whatsapp(telefone, mensagem)
+if "nivel" not in st.session_state:
+    st.session_state["nivel"] = None
 
-# Configuração MongoDB (substitua pela sua string)
+if "usuario" not in st.session_state:
+    st.session_state["usuario"] = None
+
+# Definição segura se é user
+usuario_eh_user = st.session_state.get("nivel") == "user"
+
+# --- Configuração MongoDB (substitua pela sua string) ---
+
 MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreynsd.mongodb.net/"
 client = MongoClient(MONGO_URI)
 db = client["academia_karate"]
@@ -62,7 +45,6 @@ col_mensalidades = db["mensalidades"]
 col_exames = db["exames"]
 col_equipamentos = db["equipamentos"]
 col_emprestimos = db["emprestimos"]
-
 
 # --- Estilo CSS: Fundo azul escuro e texto branco ---
 st.markdown(
@@ -102,7 +84,83 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---------- FUNÇÕES ----------
+# ---------- FUNÇÕES AUXILIARES ----------
+
+belt_progression = {
+    'Branca': {'next': 'Cinza', 'months': 3, 'value': 40.00},
+    'Cinza': {'next': 'Azul', 'months': 3, 'value': 45.00},
+    'Azul': {'next': 'Amarela', 'months': 3, 'value': 55.00},
+    'Amarela': {'next': 'Vermelha', 'months': 3, 'value': 60.00},
+    'Vermelha': {'next': 'Laranja', 'months': 6, 'value': 65.00},
+    'Laranja': {'next': 'Verde', 'months': 9, 'value': 70.00},
+    'Verde': {'next': 'Roxa', 'months': 9, 'value': 75.00},
+    'Roxa': {'next': 'Marrom2', 'months': 12, 'value': 80.00},
+    'Marrom2': {'next': 'Marrom1', 'months': 12, 'value': 90.00},
+    'Marrom1': {'next': 'Preta', 'months': 12, 'value': 100.00},
+    'Preta': {'next': 'Preta1', 'months': 12, 'value': 110.00}
+}
+
+def enviar_mensagem_whatsapp(telefone, mensagem):
+    numero = telefone.replace("(", "").replace(")", "").replace("-", "").replace(" ", "")
+    texto = urllib.parse.quote(mensagem)
+    url = f"https://api.whatsapp.com/send?phone=55{numero}&text={texto}"
+    st.markdown(f"[Clique aqui para enviar mensagem via WhatsApp]({url})", unsafe_allow_html=True)
+
+def enviar_alerta_mensalidade():
+    hoje = datetime.today().date()
+    
+    # Data fixa de vencimento: dia 5 do mês atual
+    vencimento_fixo = hoje.replace(day=5)
+    
+    # Se hoje passou do dia 5, verifica vencimento do próximo mês
+    if hoje.day > 5:
+        mes = 1 if hoje.month == 12 else hoje.month + 1
+        ano = hoje.year + (1 if hoje.month == 12 else 0)
+        vencimento_fixo = vencimento_fixo.replace(year=ano, month=mes)
+    
+    # Define as datas para os alertas
+    datas_alerta = {
+        3: vencimento_fixo - timedelta(days=3),
+        2: vencimento_fixo - timedelta(days=2),
+        1: vencimento_fixo - timedelta(days=1),
+    }
+    
+    # Busca mensalidades não pagas
+    mensalidades = list(col_mensalidades.find({"pago": False}))
+    
+    for mensalidade in mensalidades:
+        aluno_nome = mensalidade['aluno']
+        
+        aluno_doc = col_alunos.find_one({"nome": aluno_nome})
+        if not aluno_doc:
+            continue
+
+        telefone = aluno_doc.get("telefone")
+        if not telefone:
+            continue
+
+        try:
+            vencimento = datetime.strptime(mensalidade['vencimento'], "%Y-%m-%d").date()
+        except:
+            continue
+
+        # Verifica alertas por data
+        dias_restantes = (vencimento - hoje).days
+
+        if dias_restantes in datas_alerta:
+            mensagem = (
+                f"Olá {aluno_nome}, sua mensalidade vence em {dias_restantes} dia(s) "
+                f"({vencimento.strftime('%d/%m/%Y')}). "
+                f"Por favor, realize o pagamento para evitar suspensão das aulas."
+            )
+            enviar_mensagem_whatsapp(telefone, mensagem)
+
+        elif dias_restantes < 0:
+            mensagem = (
+                f"⚠️ Olá {aluno_nome}, sua mensalidade venceu no dia "
+                f"{vencimento.strftime('%d/%m/%Y')}. Regularize o pagamento o quanto antes para evitar restrições às aulas."
+            )
+            enviar_mensagem_whatsapp(telefone, mensagem)
 
 def hash_password(password):
     import hashlib
@@ -155,33 +213,6 @@ def exportar_pdf_presencas():
     c.save()
     buffer.seek(0)
     return buffer
-
-import datetime
-
-def enviar_alerta_mensalidade():
-    hoje = datetime.today().date()
-
-    # pega só mensalidades em aberto
-    mensalidades_abertas = list(col_mensalidades.find({"pago": False}))
-
-    for m in mensalidades_abertas:
-        # converte string para date
-        try:
-            venc = datetime.strptime(m["vencimento"], "%Y-%m-%d").date()
-        except:
-            continue
-
-        # envia sempre que o app abre, até pagar
-        aluno = col_alunos.find_one({"nome": m["aluno"]})
-        if aluno:
-            tel = aluno.get("telefone", "")
-            nome = aluno["nome"]
-            if tel:
-                texto = (
-                    f"Olá {nome}, sua mensalidade vence em {venc.strftime('%d/%m/%Y')}."
-                    " Por favor, realize o pagamento o quanto antes."
-                )
-                enviar_mensagem_whatsapp(tel, texto)
 
 def exportar_pdf_mensalidades():
     buffer = io.BytesIO()
@@ -275,13 +306,8 @@ def exportar_pdf_equipamentos():
 
 # ---------- PÁGINAS ----------
 
-import bcrypt
-
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-
 def criar_admin():
-    st.title("🥋 空手道 (Karatedō) - Primeiro Acesso")
+    st.title("🥋 空手道 (Karatedō) - Primeiro Acesso - By Malheiros")
     st.info("Nenhum usuário encontrado. Crie o usuário administrador.")
 
     usuario = st.text_input("Usuário Admin")
@@ -297,10 +323,8 @@ def criar_admin():
             st.error("Preencha todos os campos.")
             return
 
-        # Criptografa a senha
         hashed = bcrypt.hashpw(senha.encode(), bcrypt.gensalt())
 
-        # Cria o admin com nível admin
         col_usuarios.insert_one({
             "usuario": usuario,
             "senha": hashed,
@@ -311,18 +335,17 @@ def criar_admin():
         st.rerun()
 
 def login():
-    st.title("🥋 空手道 (Karatedō) - Sistema Karatê")
+    st.title("🥋 空手道 (Karatedō) - Sistema Karatê -By Malheiros")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
     if st.button("Entrar"):
         user = col_usuarios.find_one({"usuario": usuario})
         if user and bcrypt.checkpw(senha.encode(), user["senha"]):
-           st.session_state["logado"] = True
-           st.session_state["nivel"] = user["nivel"]
-           st.session_state["usuario"] = usuario
+            st.session_state["logado"] = True
+            st.session_state["nivel"] = user["nivel"]
+            st.session_state["usuario"] = usuario
         else:
             st.error("Credenciais inválidas")
-
 
 def pagina_geral():
     st.header("🥋 空手道 (Karatedō) - Cadastros Gerais da Academia")
@@ -331,8 +354,8 @@ def pagina_geral():
     if dados:
         st.success(f"**Academia cadastrada:** {dados.get('nome','')}")
         st.write(f"**CNPJ:** {dados.get('cnpj','')}")
-        if dados.get("logo_url"):
-            st.image(dados["logo_url"], width=200)
+        if dados.get("logo_data"):
+            st.image(dados["logo_data"], width=200)
 
     with st.form("form_geral"):
         nome = st.text_input("Nome da Academia", value=dados.get("nome") if dados else "")
@@ -340,18 +363,15 @@ def pagina_geral():
         logo = st.file_uploader("Logo da Academia", type=["png","jpg","jpeg"])
 
         if st.form_submit_button("Salvar Dados Gerais"):
-            logo_url = None
+            logo_data = None
             if logo:
-                logo_path = f"logo_academia.{logo.type.split('/')[-1]}"
-                with open(logo_path, "wb") as f:
-                    f.write(logo.getbuffer())
-                logo_url = logo_path
+                logo_data = logo.getvalue()
 
             col_academia.delete_many({})
             col_academia.insert_one({
                 "nome": nome,
                 "cnpj": cnpj,
-                "logo_url": logo_url
+                "logo_data": logo_data
             })
             st.success("Dados salvos com sucesso!")
             st.rerun()
@@ -498,6 +518,144 @@ def pagina_mensalidades():
     if st.button("Exportar PDF de Mensalidades"):
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
+            
+def pagina_grade_presenca():
+    st.subheader("🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
+    from datetime import datetime, timedelta
+
+    col1, col2 = st.columns(2)
+    with col1:
+        # Crie a função fora do selectbox
+        def nome_mes(x):
+            return datetime(2000, x, 1).strftime("%B")
+
+        mes = st.selectbox(
+            "Selecione o mês",
+            list(range(1, 13)),
+            format_func=nome_mes
+        )
+
+    with col2:
+        ano = st.selectbox(
+            "Selecione o ano",
+            list(range(2025, datetime.now().year + 1))
+        )
+
+    primeiro_dia = datetime(ano, mes, 1)
+    if mes == 12:
+        proximo_mes = datetime(ano + 1, 1, 1)
+    else:
+        proximo_mes = datetime(ano, mes + 1, 1)
+    dias_mes = pd.date_range(start=primeiro_dia, end=proximo_mes - pd.Timedelta(days=1))
+
+    # Buscar alunos ativos
+    alunos_ativos = list(col_alunos.find({"ativo": True}, {"_id": 0, "nome": 1}))
+    nomes_ativos = [a["nome"] for a in alunos_ativos]
+
+    # Buscar todas as presenças (garante nome existe)
+    todas_presencas = list(
+        col_presencas.find(
+            {"nome": {"$exists": True}},
+            {"_id": 0, "nome": 1, "data": 1}
+        )
+    )
+
+    df_presencas = pd.DataFrame(todas_presencas)
+
+    # Filtra as presenças do mês/ano
+    if not df_presencas.empty:
+        df_presencas["data"] = pd.to_datetime(df_presencas["data"], errors='coerce')
+        df_presencas = df_presencas[
+            (df_presencas["data"].dt.month == mes) &
+            (df_presencas["data"].dt.year == ano)
+        ]
+    else:
+        df_presencas = pd.DataFrame(columns=["nome", "data"])
+
+    # Cria grade
+    grid_data = pd.DataFrame({"Aluno": nomes_ativos})
+    for dia in dias_mes:
+        grid_data[dia.day] = ""
+
+    # Marca presença com "X"
+    if not df_presencas.empty and "nome" in df_presencas.columns:
+        for _, row in df_presencas.iterrows():
+            nome = row.get("nome")
+            data = row.get("data")
+
+            if pd.isna(nome) or pd.isna(data):
+                continue
+
+            if nome in nomes_ativos:
+                grid_data.loc[grid_data["Aluno"] == nome, data.day] = "X"
+    else:
+        st.warning("Nenhuma presença encontrada para o período selecionado.")
+
+    # Configura grid
+    gb = GridOptionsBuilder.from_dataframe(grid_data)
+    gb.configure_default_column(resizable=True, width=40)
+    gb.configure_grid_options(domLayout='normal')
+    gridOptions = gb.build()
+
+    st.info(f"Grade de presenças para **{datetime(ano, mes, 1).strftime('%B/%Y')}**")
+
+    AgGrid(grid_data, gridOptions=gridOptions, fit_columns_on_grid_load=True)
+    
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import Table, TableStyle
+    import io
+    from datetime import datetime
+
+    def gerar_pdf_grade(df, mes, ano):
+        buffer = io.BytesIO()
+        
+        # Cria PDF em paisagem
+        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+        
+        # Título
+        c.setFont("Helvetica-Bold", 16)
+        titulo = f"Grade de Presença - {datetime(ano, mes, 1).strftime('%B/%Y')}"
+        c.drawString(2 * cm, 19 * cm, titulo)
+        
+        # Prepara dados para tabela
+        data = [list(df.columns)] + df.astype(str).values.tolist()
+        
+        # Cria tabela do reportlab
+        table = Table(data, repeatRows=1, colWidths=[3*cm] + [1.2*cm]*(len(df.columns)-1))
+        
+        # Estilo da tabela
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
+        ])
+        table.setStyle(style)
+        
+        # Posiciona tabela
+        table.wrapOn(c, 20*cm, 15*cm)
+        table.drawOn(c, 2 * cm, 2 * cm)
+        
+        c.save()
+        pdf = buffer.getvalue()
+        buffer.close()
+        return pdf
+
+        # --- PDF Download ---
+        pdf_bytes = gerar_pdf_grade(grid_data, mes, ano)
+
+        st.download_button(
+            label="📄 Baixar Relatório em PDF",
+            data=pdf_bytes,
+            file_name=f"grade_presenca_{mes}_{ano}.pdf",
+            mime="application/pdf",
+    )   
 
 def pagina_exames():
     st.header("🥋 空手道 (Karatedō) - Histórico de Exames")
@@ -569,7 +727,11 @@ def pagina_equipamentos():
     equipamentos = list(col_equipamentos.find())
     if equipamentos:
         for eq in equipamentos:
-            st.markdown(f"**{eq['nome']}** - Quantidade: {eq['quantidade']}")
+            nome = eq.get('nome', 'Sem nome')
+            quantidade = eq.get('quantidade', 0)
+            st.markdown(f"**{nome}** - Quantidade: {quantidade}")
+    else:
+        st.info("Nenhum equipamento cadastrado.")
 
     st.header("🥋 空手道 (Karatedō) - Adicionar Equipamento")
     with st.form("form_equipamento"):
@@ -817,11 +979,12 @@ else:
     col1, col2 = st.columns([8, 1])
     with col1:
         pagina = st.radio(
-            "Menu",
-            ["Alunos", "Presenças", "Mensalidades", "Exames","Empréstimos", "Equipamentos", "Cadastros Gerais","Sistema"],
-            horizontal=True,
-            label_visibility="collapsed"
+           "Menu",
+           ["Alunos", "Presenças", "Grade de Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais", "Sistema"],
+           horizontal=True,
+           label_visibility="collapsed"
         )
+
         def logout():
             st.session_state.logado = False
             st.rerun()
@@ -835,8 +998,11 @@ else:
         pagina_alunos()
     elif pagina == "Presenças":
         pagina_presencas()
+    elif pagina == "Grade de Presenças":
+        pagina_grade_presenca()
     elif pagina == "Mensalidades":
         pagina_mensalidades()
+        enviar_alerta_mensalidade()
     elif pagina == "Exames":
         pagina_exames()
     elif pagina == "Empréstimos":
