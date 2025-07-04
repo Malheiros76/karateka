@@ -477,7 +477,6 @@ def pagina_presencas():
 
 def pagina_mensalidades():
     st.header("🥋 空手道 (Karatedō) - Mensalidades Registradas")
-        enviar_alerta_mensalidade()
     mensalidades = list(col_mensalidades.find().sort("vencimento", -1))
     if mensalidades:
         for m in mensalidades:
@@ -853,6 +852,7 @@ else:
         pagina_presencas()
     elif pagina == "Mensalidades":
         pagina_mensalidades()
+        enviar_alerta_mensalidade()
     elif pagina == "Exames":
         pagina_exames()
     elif pagina == "Empréstimos":
