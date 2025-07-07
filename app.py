@@ -687,89 +687,8 @@ def pagina_mensalidades():
     if st.button("Exportar PDF de Mensalidades"):
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-                
-def pagina_grade_presenca():
-    st.subheader("🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
-    from datetime import datetime, timedelta
-
-    col1, col2 = st.columns(2)
-    with col1:
-        # Crie a função fora do selectbox
-        def nome_mes(x):
-            return datetime(2000, x, 1).strftime("%B")
-
-        mes = st.selectbox(
-            "Selecione o mês",
-            list(range(1, 13)),
-            format_func=nome_mes
-        )
-
-    with col2:
-        ano = st.selectbox(
-            "Selecione o ano",
-            list(range(2025, datetime.now().year + 1))
-        )
-
-    primeiro_dia = datetime(ano, mes, 1)
-    if mes == 12:
-        proximo_mes = datetime(ano + 1, 1, 1)
-    else:
-        proximo_mes = datetime(ano, mes + 1, 1)
-    dias_mes = pd.date_range(start=primeiro_dia, end=proximo_mes - pd.Timedelta(days=1))
-
-    # Buscar alunos ativos
-    alunos_ativos = list(col_alunos.find({"ativo": True}, {"_id": 0, "nome": 1}))
-    nomes_ativos = [a["nome"] for a in alunos_ativos]
-
-    # Buscar todas as presenças (garante nome existe)
-    todas_presencas = list(
-        col_presencas.find(
-            {"nome": {"$exists": True}},
-            {"_id": 0, "nome": 1, "data": 1}
-        )
-    )
-
-    df_presencas = pd.DataFrame(todas_presencas)
-
-    # Filtra as presenças do mês/ano
-    if not df_presencas.empty:
-        df_presencas["data"] = pd.to_datetime(df_presencas["data"], errors='coerce')
-        df_presencas = df_presencas[
-            (df_presencas["data"].dt.month == mes) &
-            (df_presencas["data"].dt.year == ano)
-        ]
-    else:
-        df_presencas = pd.DataFrame(columns=["nome", "data"])
-
-    # Cria grade
-    grid_data = pd.DataFrame({"Aluno": nomes_ativos})
-    for dia in dias_mes:
-        grid_data[dia.day] = ""
-
-    # Marca presença com "X"
-    if not df_presencas.empty and "nome" in df_presencas.columns:
-        for _, row in df_presencas.iterrows():
-            nome = row.get("nome")
-            data = row.get("data")
-
-            if pd.isna(nome) or pd.isna(data):
-                continue
-
-            if nome in nomes_ativos:
-                grid_data.loc[grid_data["Aluno"] == nome, data.day] = "X"
-    else:
-        st.warning("Nenhuma presença encontrada para o período selecionado.")
-
-    # Configura grid
-    gb = GridOptionsBuilder.from_dataframe(grid_data)
-    gb.configure_default_column(resizable=True, width=40)
-    gb.configure_grid_options(domLayout='normal')
-    gridOptions = gb.build()
-
-    st.info(f"Grade de presenças para **{datetime(ano, mes, 1).strftime('%B/%Y')}**")
-
-    AgGrid(grid_data, gridOptions=gridOptions, fit_columns_on_grid_load=True)
-    
+             
+   
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import cm
@@ -1164,7 +1083,7 @@ else:
     with col1:
         pagina = st.radio(
            "Menu",
-           ["Alunos", "Presenças", "Grade de Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais", "Sistema"],
+           ["Alunos", "Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais", "Sistema"],
            horizontal=True,
            label_visibility="collapsed"
         )
@@ -1182,8 +1101,6 @@ else:
         pagina_alunos()
     elif pagina == "Presenças":
         pagina_presencas()
-    elif pagina == "Grade de Presenças":
-        pagina_grade_presenca()
     elif pagina == "Mensalidades":
         pagina_mensalidades()
         enviar_alerta_mensalidade()
