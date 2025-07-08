@@ -859,6 +859,34 @@ def pagina_equipamentos():
                 st.error("Nome do equipamento é obrigatório.")
 
 # -------------------------------------------------------
+# PÁGINA DE EQUIPAMENTOS
+# -------------------------------------------------------
+
+def pagina_equipamentos():
+    st.header("🥋 空手道 (Karatedō) - 🎽 Equipamentos")
+
+    equipamentos = list(col_equipamentos.find())
+    if equipamentos:
+        for eq in equipamentos:
+            nome = eq.get('nome', 'Sem nome')
+            quantidade = eq.get('quantidade', 0)
+            st.markdown(f"**{nome}** - Quantidade: {quantidade}")
+    else:
+        st.info("Nenhum equipamento cadastrado.")
+
+    st.header("🥋 空手道 (Karatedō) - Adicionar Equipamento")
+    with st.form("form_equipamento"):
+        nome = st.text_input("Nome do Equipamento")
+        quantidade = st.number_input("Quantidade", min_value=0, step=1)
+        if st.form_submit_button("Adicionar"):
+            if nome:
+                col_equipamentos.insert_one({"nome": nome, "quantidade": quantidade})
+                st.success("Equipamento adicionado!")
+                st.rerun()
+            else:
+                st.error("Nome do equipamento é obrigatório.")
+
+# -------------------------------------------------------
 # PÁGINA DE EMPRESTIMOS
 # -------------------------------------------------------
 
@@ -1004,6 +1032,8 @@ def pagina_emprestimos():
             )
             st.markdown("---")
 
+    st.markdown("---")
+
     # --- Inventário de Equipamentos ---
     st.subheader("🥋 空手道 (Karatedō) - Inventário de Equipamentos")
     equipamentos_todos = list(col_equipamentos.find())
@@ -1012,21 +1042,15 @@ def pagina_emprestimos():
         st.info("Nenhum equipamento cadastrado.")
     else:
         for eq in equipamentos_todos:
-    tipo = eq.get("tipo", "Desconhecido")
-    tamanho = eq.get("tamanho", "N/A")
-    codigo = eq.get("codigo", "N/A")
-    estado = eq.get("estado", "N/A")
-    cor_faixa = eq.get("cor_faixa", "")
-
-    faixa_info = f" | Cor Faixa: {cor_faixa}" if cor_faixa else ""
-    
-    st.markdown(
-        f"**Tipo:** {tipo}  \n"
-        f"**Tamanho:** {tamanho}  \n"
-        f"**Código:** {codigo}  \n"
-        f"**Estado:** {estado}{faixa_info}"
-    )
-    st.markdown("---")
+            cor_faixa = eq.get("cor_faixa", "")
+            faixa_info = f" | Cor Faixa: {cor_faixa}" if cor_faixa else ""
+            st.markdown(
+                f"**Tipo:** {eq['tipo']}  \n"
+                f"**Tamanho:** {eq['tamanho']}  \n"
+                f"**Código:** {eq['codigo']}  \n"
+                f"**Estado:** {eq['estado']}{faixa_info}"
+            )
+            st.markdown("---")
 
 # -------------------------------------------------------
 # PÁGINA DE ADMIN DO SISTEMA
