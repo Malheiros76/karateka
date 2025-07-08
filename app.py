@@ -550,7 +550,7 @@ client = MongoClient(MONGO_URI)
 col_alunos = db["alunos"]
 col_presencas = db["presencas"]
 
-# ------------------------------------
+ ------------------------------------
 # FUNÇÃO PRINCIPAL
 # ------------------------------------
 def pagina_presencas():
@@ -583,39 +583,22 @@ def pagina_presencas():
             data[dia] = ""
         df_grid = pd.DataFrame(data)
 
-    # LIMPEZA OBRIGATÓRIA
+    # LIMPEZA
     df_grid = df_grid.drop(columns=["_id"], errors="ignore")
     df_grid = df_grid.fillna("")
     df_grid = df_grid.astype(str)
 
-    # aviso se estiver vazio
-    if df_grid.empty:
-        st.warning("DataFrame está vazio!")
-
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-    # Configuração do grid
-    gb = GridOptionsBuilder.from_dataframe(df_grid)
-    gb.configure_default_column(editable=True, minWidth=80, resizable=True)
-    gb.configure_column("Aluno", editable=False, pinned="left", width=250)
-
-    for col in df_grid.columns:
-        if col != "Aluno":
-            gb.configure_column(col, editable=True, width=80)
-
-    grid_options = gb.build()
-
-    grid_response = AgGrid(
+    # ✅ TABELA EDITÁVEL
+    new_df = st.data_editor(
         df_grid,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        fit_columns_on_grid_load=False,
-        height=1000,
-        key="presencas_grid"
+        use_container_width=True,
+        num_rows="dynamic",
+        key="presencas_editor"
     )
 
-    new_df = grid_response["data"]
-
+    # Botão para salvar
     if st.button("Salvar Presenças"):
         col_presencas.update_one(
             {"ano": ano, "mes": mes},
@@ -631,6 +614,7 @@ def pagina_presencas():
     if st.button("Exportar PDF de Presenças"):
         pdf_bytes = exportar_pdf_presencas(new_df)
         st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
+✅
         
 # -------------------------------------------------------
 # PÁGINA DE MENSALIDADES
