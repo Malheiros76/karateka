@@ -624,6 +624,11 @@ import urllib.parse
 # -------------------------------
 # Pagina Mensalidades
 # -------------------------------
+from datetime import datetime
+import streamlit as st
+from pymongo import MongoClient
+import urllib
+
 # -------------------------------
 # BANCO
 # -------------------------------
@@ -649,7 +654,24 @@ def pagina_mensalidades():
     if mensalidades:
         for m in mensalidades:
             pago = "✅" if m.get("pago") else "❌"
-            st.markdown(f"📌 {m['aluno']} | Vencimento: {m['vencimento']} | Pago: {pago}")
+
+            # cria colunas para texto e botão lado a lado
+            col1, col2 = st.columns([0.8, 0.2])
+
+            with col1:
+                st.markdown(f"📌 **{m['aluno']}** | Vencimento: {m['vencimento']} | Pago: {pago}")
+
+            with col2:
+                botao_excluir = st.button(
+                    "🗑️ Excluir",
+                    key=f"excluir_{str(m['_id'])}"
+                )
+
+            if botao_excluir:
+                col_mensalidades.delete_one({"_id": m["_id"]})
+                st.success(f"Mensalidade de {m['aluno']} excluída!")
+                st.rerun()
+
     else:
         st.info("Nenhuma mensalidade registrada.")
 
@@ -719,35 +741,6 @@ def pagina_mensalidades():
         aluno = st.selectbox("Aluno", aluno_nomes)
 
         # calcula o próximo dia 5
-        if hoje.day <= 5:
-            prox_venc = hoje.replace(day=5)
-        else:
-            # pula para o mês seguinte
-            ano = hoje.year + (1 if hoje.month == 12 else 0)
-            mes = 1 if hoje.month == 12 else hoje.month + 1
-            prox_venc = hoje.replace(year=ano, month=mes, day=5)
-
-        vencimento = st.date_input("Data de Vencimento", value=prox_venc)
-        pago = st.checkbox("Pago?")
-
-        submit = st.form_submit_button("Registrar")
-
-        if submit:
-            col_mensalidades.insert_one({
-                "aluno": aluno,
-                "vencimento": str(vencimento),
-                "pago": pago
-            })
-            st.success("Mensalidade registrada!")
-            st.rerun()
-
-    # -------------------------------
-    # Botão de exportar PDF
-    # -------------------------------
-    if st.button("Exportar PDF de Mensalidades"):
-        pdf_bytes = exportar_pdf_mensalidades()
-        st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-
 # -------------------------------------------------------
 # PÁGINA DE EXAMES
 # -------------------------------------------------------
