@@ -625,7 +625,7 @@ import urllib.parse
 # BANCO
 # -------------------------------
 client = MongoClient(MONGO_URI)
-db = client["SEU_DATABASE_NAME"]    # ajuste o nome do banco
+db = client["academia_karate"]
 col_alunos = db["alunos"]
 col_mensalidades = db["mensalidades"]
 
