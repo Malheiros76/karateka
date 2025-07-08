@@ -538,6 +538,9 @@ def pagina_alunos():
                 st.success("Aluno cadastrado!")
                 st.rerun()
 
+# -------------------------------------------------------
+# PÁGINA DE PRESENÇAS
+# -------------------------------------------------------
 from datetime import datetime, timedelta
 import streamlit as st
 from pymongo import MongoClient
@@ -546,57 +549,19 @@ import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 import io
+import numpy as np
 
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
 # ------------------------------------
-# Descomente e ajuste conforme seu ambiente:
 # client = MongoClient("mongodb://localhost:27017/")
 # db = client["karate"]
 # col_alunos = db["alunos"]
 # col_presencas = db["presencas"]
 
-# ------------------------------------
-# FUNÇÃO PARA EXPORTAR PDF DE PRESENÇAS
-# ------------------------------------
-def exportar_pdf_presencas(df):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    largura_pagina, altura_pagina = A4
-
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, altura_pagina - 40, "Relatório de Presenças")
-
-    x_pos = 40
-    y_pos = altura_pagina - 70
-
-    for col in df.columns:
-        c.drawString(x_pos, y_pos, str(col))
-        x_pos += 70
-    y_pos -= 20
-
-    for _, row in df.iterrows():
-        x_pos = 40
-        for item in row:
-            c.drawString(x_pos, y_pos, str(item))
-            x_pos += 70
-        y_pos -= 20
-        if y_pos < 50:
-            c.showPage()
-            y_pos = altura_pagina - 50
-
-    c.save()
-    pdf = buffer.getvalue()
-    buffer.close()
-    return pdf
-
-# ------------------------------------
-# FUNÇÃO PRINCIPAL - PÁGINA DE PRESENÇAS
-# ------------------------------------
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
-    # Carregar alunos
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
 
@@ -604,19 +569,18 @@ def pagina_presencas():
     ano = hoje.year
     mes = hoje.month
 
-    # Criar lista de datas do mês
+    # cria lista de datas do mês
     dias_no_mes = []
     dia_atual = datetime(ano, mes, 1)
     while dia_atual.month == mes:
         dias_no_mes.append(dia_atual.strftime("%d/%m"))
         dia_atual += timedelta(days=1)
 
-    # Buscar presenças do mês
     registros = list(col_presencas.find({"ano": ano, "mes": mes}))
     df_presencas = pd.DataFrame(registros)
 
     if df_presencas.empty:
-        # Grid vazio
+        # cria grade vazia
         data = {"Aluno": nomes_alunos}
         for dia in dias_no_mes:
             data[dia] = ""
@@ -632,29 +596,59 @@ def pagina_presencas():
                 data[dia] = ""
             df_grid = pd.DataFrame(data)
 
+    # ---------------------------------------------------------
+    # VALIDAÇÃO E PREPARAÇÃO DO DATAFRAME PARA AgGrid
+    # ---------------------------------------------------------
+
+    df_grid.reset_index(drop=True, inplace=True)
+
+    # Renomeia coluna mal formatada se necessário
+    if 0 in df_grid.columns:
+        st.warning("Corrigindo coluna inválida chamada '0'")
+        df_grid = df_grid.rename(columns={0: "Aluno"})
+
+    # Força que "Aluno" exista
+    if "Aluno" not in df_grid.columns:
+        col_candidatas = [col for col in df_grid.columns if isinstance(col, str) and "nome" in col.lower()]
+        if col_candidatas:
+            df_grid = df_grid.rename(columns={col_candidatas[0]: "Aluno"})
+
+    colunas_esperadas = ["Aluno"] + dias_no_mes
+    for col in colunas_esperadas:
+        if col not in df_grid.columns:
+            df_grid[col] = ""
+
+    df_grid = df_grid.dropna(how="all").fillna("")
+
+    for col in df_grid.columns:
+        if df_grid[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
+            df_grid[col] = df_grid[col].apply(str)
+
+    for col in df_grid.columns:
+        if df_grid[col].apply(lambda x: callable(x)).any():
+            st.error(f"🛑 ERRO: A coluna '{col}' contém função. Isso quebra o AgGrid.")
+            st.stop()
+
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-    # ✅ PREPARAR DF PARA GRID (evita erros do AgGrid)
-    if not df_grid.empty:
-        df_grid.reset_index(drop=True, inplace=True)
-        if "_id" in df_grid.columns:
-            df_grid.drop(columns="_id", inplace=True)
-        df_grid = df_grid.fillna("").applymap(str)
+    if df_grid.empty:
+        st.info("Nenhum dado para exibir.")
+        return
 
     # ---------------------------
-    # Configura grid editável
+    # CONFIGURAÇÃO DO GRID
     # ---------------------------
     gb = GridOptionsBuilder.from_dataframe(df_grid)
     gb.configure_default_column(editable=True, minWidth=80, resizable=True)
     gb.configure_column("Aluno", editable=False, pinned="left", width=250)
+
     for col in df_grid.columns:
         if col != "Aluno":
             gb.configure_column(col, editable=True, width=80)
+
     grid_options = gb.build()
 
-    if df_grid.empty:
-        st.info("Nenhum dado para exibir na grade.")
-    else:
+    try:
         grid_response = AgGrid(
             df_grid,
             gridOptions=grid_options,
@@ -663,24 +657,27 @@ def pagina_presencas():
             height=1000,
             key="presencas_grid"
         )
+    except Exception as e:
+        st.error(f"Erro ao renderizar AgGrid: {e}")
+        st.stop()
 
-        new_df = grid_response["data"]
+    new_df = grid_response["data"]
 
-        if st.button("Salvar Presenças"):
-            col_presencas.update_one(
-                {"ano": ano, "mes": mes},
-                {"$set": {
-                    "ano": ano,
-                    "mes": mes,
-                    "tabela": new_df.to_dict("records")
-                }},
-                upsert=True
-            )
-            st.success("Presenças salvas com sucesso!")
+    if st.button("Salvar Presenças"):
+        col_presencas.update_one(
+            {"ano": ano, "mes": mes},
+            {"$set": {
+                "ano": ano,
+                "mes": mes,
+                "tabela": new_df.to_dict("records")
+            }},
+            upsert=True
+        )
+        st.success("Presenças salvas com sucesso!")
 
-        if st.button("Exportar PDF de Presenças"):
-            pdf_bytes = exportar_pdf_presencas(new_df)
-            st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
+    if st.button("Exportar PDF de Presenças"):
+        pdf_bytes = exportar_pdf_presencas(new_df)
+        st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
 
 # -------------------------------------------------------
 # PÁGINA DE MENSALIDADES
@@ -724,8 +721,7 @@ def pagina_mensalidades():
     if st.button("Exportar PDF de Mensalidades"):
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-             
-   
+      
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import cm
