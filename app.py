@@ -975,6 +975,12 @@ def pagina_emprestimos():
 
     st.markdown("---")
 
+# -------------------------------------------------------
+# PÁGINA DE EQUIPAMENTOS
+# ------------------------------------------------------
+   
+def pagina_equipamentos():
+
     # --- Inventário de Equipamentos ---
     st.subheader("🥋 空手道 (Karatedō) - Inventário de Equipamentos")
     equipamentos_todos = list(col_equipamentos.find())
