@@ -595,6 +595,14 @@ def pagina_presencas():
             for dia in dias_no_mes:
                 data[dia] = ""
             df_grid = pd.DataFrame(data)
+import json
+
+try:
+    # Tenta serializar grid_options
+    json.dumps(grid_options, indent=2, default=str)
+except TypeError as e:
+    st.error(f"🚫 Erro no grid_options JSON: {e}")
+    st.stop()
 
     # ---------------------------------------------------------
     # VALIDAÇÃO E PREPARAÇÃO DO DATAFRAME PARA AgGrid
