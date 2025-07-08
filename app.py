@@ -544,7 +544,7 @@ def pagina_alunos():
 from datetime import datetime, timedelta
 import streamlit as st
 from pymongo import MongoClient
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+from st_aggrid import AgGrid
 import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -562,6 +562,7 @@ import numpy as np
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
+    # Carregar alunos e datas
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
 
@@ -595,14 +596,6 @@ def pagina_presencas():
             for dia in dias_no_mes:
                 data[dia] = ""
             df_grid = pd.DataFrame(data)
-import json
-
-try:
-    # Tenta serializar grid_options
-    json.dumps(grid_options, indent=2, default=str)
-except TypeError as e:
-    st.error(f"🚫 Erro no grid_options JSON: {e}")
-    st.stop()
 
     # ---------------------------------------------------------
     # VALIDAÇÃO E PREPARAÇÃO DO DATAFRAME PARA AgGrid
@@ -620,6 +613,8 @@ except TypeError as e:
         col_candidatas = [col for col in df_grid.columns if isinstance(col, str) and "nome" in col.lower()]
         if col_candidatas:
             df_grid = df_grid.rename(columns={col_candidatas[0]: "Aluno"})
+        else:
+            df_grid["Aluno"] = nomes_alunos
 
     colunas_esperadas = ["Aluno"] + dias_no_mes
     for col in colunas_esperadas:
@@ -643,25 +638,14 @@ except TypeError as e:
         st.info("Nenhum dado para exibir.")
         return
 
-    # ---------------------------
-    # CONFIGURAÇÃO DO GRID
-    # ---------------------------
-    gb = GridOptionsBuilder.from_dataframe(df_grid)
-    gb.configure_default_column(editable=True, minWidth=80, resizable=True)
-    gb.configure_column("Aluno", editable=False, pinned="left", width=250)
-
-    for col in df_grid.columns:
-        if col != "Aluno":
-            gb.configure_column(col, editable=True, width=80)
-
-    grid_options = gb.build()
-
+    # ---------------------------------------------------------
+    # AGGRID SIMPLES (sem GridOptionsBuilder)
+    # ---------------------------------------------------------
     try:
         grid_response = AgGrid(
             df_grid,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.VALUE_CHANGED,
-            fit_columns_on_grid_load=False,
+            editable=True,
+            fit_columns_on_grid_load=True,
             height=1000,
             key="presencas_grid"
         )
