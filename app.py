@@ -639,9 +639,9 @@ st.write("Exemplo de dados:", df_grid.head())
 
 st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-    if df_grid.empty:
+if df_grid.empty:
         st.info("Nenhum dado para exibir na grade.")
-    else:
+else:
         # ---------------------------
         # Configura grid editável
         # ---------------------------
@@ -651,13 +651,13 @@ st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
         gb.configure_column("Aluno", editable=False, pinned="left", width=250)
 
-        for col in df_grid.columns:
+    for col in df_grid.columns:
             if col != "Aluno":
                 gb.configure_column(col, editable=True, width=80)
 
         grid_options = gb.build()
 
-        try:
+    try:
             grid_response = AgGrid(
                 df_grid,
                 gridOptions=grid_options,
@@ -666,13 +666,13 @@ st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
                 height=1000,
                 key="presencas_grid"
             )
-        except Exception as e:
+    except Exception as e:
             st.error(f"Erro ao renderizar AgGrid: {e}")
             st.stop()
 
         new_df = grid_response["data"]
 
-        if st.button("Salvar Presenças"):
+    if st.button("Salvar Presenças"):
             col_presencas.update_one(
                 {"ano": ano, "mes": mes},
                 {"$set": {
@@ -684,7 +684,7 @@ st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
             )
             st.success("Presenças salvas com sucesso!")
 
-        if st.button("Exportar PDF de Presenças"):
+    if st.button("Exportar PDF de Presenças"):
             pdf_bytes = exportar_pdf_presencas(new_df)
             st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
 
