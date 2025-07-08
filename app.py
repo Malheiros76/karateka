@@ -614,7 +614,6 @@ def pagina_presencas():
     if st.button("Exportar PDF de Presenças"):
         pdf_bytes = exportar_pdf_presencas(new_df)
         st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
-✅
         
 # -------------------------------------------------------
 # PÁGINA DE MENSALIDADES
