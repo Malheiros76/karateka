@@ -550,7 +550,7 @@ client = MongoClient(MONGO_URI)
 col_alunos = db["alunos"]
 col_presencas = db["presencas"]
 
- ------------------------------------
+#-------------------------------------
 # FUNÇÃO PRINCIPAL
 # ------------------------------------
 def pagina_presencas():
