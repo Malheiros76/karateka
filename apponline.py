@@ -13,6 +13,17 @@ import bcrypt
 import pandas as pd
 from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
+import streamlit as st
+from datetime import datetime
+from pymongo import MongoClient
+from bson import ObjectId
+from PIL import Image
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.lib.utils import ImageReader
+
 
 # --- Inicialização segura do session_state ---
 
@@ -43,6 +54,7 @@ col_mensalidades = db["mensalidades"]
 col_exames = db["exames"]
 col_equipamentos = db["equipamentos"]
 col_emprestimos = db["emprestimos"]
+col_dojo = db["dojo"]
 
 # --- Estilo CSS: Fundo azul escuro e texto branco ---
 st.markdown(
@@ -194,20 +206,63 @@ def exportar_pdf_alunos():
     buffer.seek(0)
     return buffer
 
+# -------------------------------------------------------
+# FUNÇÃO PARA EXPORTAR PDF DE PRESENÇAS
+# -------------------------------------------------------
+
 def exportar_pdf_presencas():
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(2*cm, 27*cm, "Relatório de Presenças")
-    c.setFont("Helvetica", 12)
-    y = 25*cm
-    for presenca in col_presencas.find().sort("data", -1):
-        linha = f"Data: {presenca['data']}, Presentes: {', '.join(presenca.get('presentes',[]))}"
-        c.drawString(2*cm, y, linha)
-        y -= 1*cm
-        if y < 2*cm:
-            c.showPage()
-            y = 27*cm
+
+    # -----------------------------------
+    # Buscar dados do dojo
+    # -----------------------------------
+    dojo = col_dojo.find_one({
+        "_id": ObjectId("686bbeld488b17fb0be63470")
+    })
+
+    if dojo and dojo.get("logo_data"):
+        image_data = dojo["logo_data"]
+
+        # Abrir imagem do logo
+        image = Image.open(io.BytesIO(image_data))
+
+        # Converter para ImageReader
+        img_reader = ImageReader(image)
+
+        # Desenhar imagem
+        c.drawImage(img_reader, 2*cm, 26*cm, width=4*cm, height=4*cm)
+
+        # Nome do dojo ao lado do brasão
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(7*cm, 28*cm, dojo.get("nome", "Dojo"))
+    else:
+        # Caso não encontre logo
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(2*cm, 28*cm, "Relatório de Presenças")
+
+    # -----------------------------------
+    # Buscar presenças do dia
+    # -----------------------------------
+    hoje = datetime.today().strftime("%Y-%m-%d")
+    presenca = col_presencas.find_one({"data": hoje})
+
+    y = 24*cm
+
+    if presenca and presenca.get("presentes"):
+        for nome in presenca["presentes"]:
+            c.setFont("Helvetica", 12)
+            c.drawString(2*cm, y, f"✅ {nome}")
+            y -= 1*cm
+
+            # Quebra de página se necessário
+            if y < 2*cm:
+                c.showPage()
+                y = 28*cm
+    else:
+        c.setFont("Helvetica", 12)
+        c.drawString(2*cm, 24*cm, "Nenhuma presença registrada hoje.")
+
     c.save()
     buffer.seek(0)
     return buffer
@@ -304,6 +359,10 @@ def exportar_pdf_equipamentos():
 
 # ---------- PÁGINAS ----------
 
+# -------------------------------------------------------
+# PÁGINA DE CRIAR ADMIN
+# -------------------------------------------------------
+
 def criar_admin():
     st.title("🥋 空手道 (Karatedō) - Primeiro Acesso - By Malheiros")
     st.info("Nenhum usuário encontrado. Crie o usuário administrador.")
@@ -332,6 +391,10 @@ def criar_admin():
         st.success("Usuário admin criado com sucesso! Faça login.")
         st.rerun()
 
+# -------------------------------------------------------
+# PÁGINA DE LOGIN
+# -------------------------------------------------------
+
 def login():
     st.title("🥋 空手道 (Karatedō) - Sistema Karatê -By Malheiros")
     usuario = st.text_input("Usuário")
@@ -344,6 +407,10 @@ def login():
             st.session_state["usuario"] = usuario
         else:
             st.error("Credenciais inválidas")
+
+# -------------------------------------------------------
+# PÁGINA DE GERAL
+# -------------------------------------------------------
 
 def pagina_geral():
     st.header("🥋 空手道 (Karatedō) - Cadastros Gerais da Academia")
@@ -374,17 +441,26 @@ def pagina_geral():
             st.success("Dados salvos com sucesso!")
             st.rerun()
 
+# -------------------------------------------------------
+# PÁGINA DE ALUNOS
+# -------------------------------------------------------
+
+from datetime import datetime, timedelta
+import streamlit as st
+from bson import ObjectId
+
 def pagina_alunos():
     st.header("🥋 空手道 (Karatedō) - Alunos Cadastrados")
     alunos = list(col_alunos.find())
 
     if alunos:
         for a in alunos:
-            col1, col2, col3 = st.columns([4,4,4])
+            col1, col2, col3 = st.columns([4, 4, 4])
             with col1:
-                st.markdown(f"**{a['nome']}** | RG: {a.get('rg','')} | Faixa: {a.get('faixa','')} | Tel: {a.get('telefone','')}")
+                st.markdown(
+                    f"**{a['nome']}** | RG: {a.get('rg','')} | Faixa: {a.get('faixa','')} | Tel: {a.get('telefone','')}"
+                )
             with col2:
-                # Botão para editar
                 if st.button(f"✏️ Editar {a['nome']}", key=f"editar_{a['_id']}"):
                     st.session_state["editar_id"] = str(a["_id"])
                     st.experimental_rerun()
@@ -394,18 +470,30 @@ def pagina_alunos():
                     st.success(f"Aluno {a['nome']} excluído!")
                     st.rerun()
     else:
-        st.info("Nenhum aluno cadastrado.")
+            st.info("Nenhum aluno cadastrado.")
 
     editar_id = st.session_state.get("editar_id", None)
+
     if editar_id:
         aluno_edit = col_alunos.find_one({"_id": ObjectId(editar_id)})
+
         st.subheader(f"Editar Aluno: {aluno_edit['nome']}")
+
         with st.form("form_editar_aluno"):
             nome = st.text_input("Nome", value=aluno_edit["nome"])
             rg = st.text_input("RG", value=aluno_edit.get("rg", ""))
-            faixa = st.selectbox("Faixa", ["Branca", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"], index=["Branca", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"].index(aluno_edit.get("faixa","Branca")))
-            data_nascimento = st.date_input("Data de Nascimento", value=datetime.strptime(aluno_edit.get("data_nascimento", "2000-01-01"), "%Y-%m-%d"))
-            telefone = st.text_input("Telefone/WhatsApp (com DDD)", value=aluno_edit.get("telefone",""))
+            faixa = st.selectbox(
+                "Faixa",
+                ["Branca","cinza", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"],
+                index=[
+                    "Branca","cinza", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"
+                ].index(aluno_edit.get("faixa", "Branca")),
+            )
+            data_nascimento = st.date_input(
+                "Data de Nascimento",
+                value=datetime.strptime(aluno_edit.get("data_nascimento", "1900-01-01"), "%Y-%m-%d")
+            )
+            telefone = st.text_input("Telefone/WhatsApp (com DDD)", value=aluno_edit.get("telefone", ""))
 
             if st.form_submit_button("Salvar Alterações"):
                 col_alunos.update_one(
@@ -427,14 +515,18 @@ def pagina_alunos():
             st.rerun()
 
     else:
-        # Formulário para cadastrar novo aluno, só aparece se não estiver editando
+        # Formulário para cadastrar novo aluno (só aparece se não estiver editando)
         st.header("🥋 空手道 (Karatedō) - Cadastrar Novo Aluno")
         with st.form("form_aluno"):
             nome = st.text_input("Nome")
             rg = st.text_input("RG")
-            faixa = st.selectbox("Faixa", ["Branca", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"])
+            faixa = st.selectbox(
+                "Faixa",
+                ["Branca", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"]
+            )
             data_nascimento = st.date_input("Data de Nascimento")
             telefone = st.text_input("Telefone/WhatsApp (com DDD)", max_chars=15)
+
             if st.form_submit_button("Cadastrar"):
                 col_alunos.insert_one({
                     "nome": nome,
@@ -446,37 +538,116 @@ def pagina_alunos():
                 st.success("Aluno cadastrado!")
                 st.rerun()
 
-from datetime import datetime, timedelta
+# -------------------------------------------------------
+# PÁGINA DE PRESENÇAS
+# -------------------------------------------------------
 
+from datetime import datetime, timedelta
+import streamlit as st
+from pymongo import MongoClient
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+import pandas as pd
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+import io
+
+# ------------------------------------
+# CONFIGURAÇÃO DO BANCO
+# ------------------------------------
+# Exemplo de conexão
+# client = MongoClient("mongodb://localhost:27017/")
+# db = client["karate"]
+# col_alunos = db["alunos"]
+# col_presencas = db["presencas"]
+
+# ------------------------------------
+# FUNÇÃO PRINCIPAL
+# ------------------------------------
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
-    hoje = datetime.today().strftime("%Y-%m-%d")
-    presenca = col_presencas.find_one({"data": hoje})
-
-    st.subheader("Presenças Hoje")
-    if presenca and presenca.get("presentes"):
-        for nome in presenca["presentes"]:
-            st.markdown(f"✅ {nome}")
-    else:
-        st.info("Nenhuma presença registrada hoje.")
-
-    st.header("🥋 空手道 (Karatedō) - Registrar Presença")
+    # Carregar alunos e datas
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
-    with st.form("form_presenca"):
-        presentes = st.multiselect("Selecione os alunos presentes", nomes_alunos)
-        if st.form_submit_button("Registrar"):
-            if presenca:
-                col_presencas.update_one({"_id": presenca["_id"]}, {"$set": {"presentes": presentes}})
-            else:
-                col_presencas.insert_one({"data": hoje, "presentes": presentes})
-            st.success("Presença registrada!")
-            st.rerun()
+
+    hoje = datetime.today()
+    ano = hoje.year
+    mes = hoje.month
+
+    # cria lista de datas do mês
+    dias_no_mes = []
+    dia_atual = datetime(ano, mes, 1)
+    while dia_atual.month == mes:
+        dias_no_mes.append(dia_atual.strftime("%d/%m"))
+        dia_atual += timedelta(days=1)
+
+    registros = list(col_presencas.find({"ano": ano, "mes": mes}))
+    df_presencas = pd.DataFrame(registros)
+
+    if df_presencas.empty:
+        # cria grid vazio
+        data = {"Aluno": nomes_alunos}
+        for dia in dias_no_mes:
+            data[dia] = ""
+        df_grid = pd.DataFrame(data)
+    else:
+        registro = df_presencas.iloc[0]
+        if "tabela" in registro and registro["tabela"] is not None:
+            df_grid = pd.DataFrame(registro["tabela"])
+        else:
+            st.warning("Documento encontrado, mas sem dados salvos. Exibindo grade vazia.")
+            data = {"Aluno": nomes_alunos}
+            for dia in dias_no_mes:
+                data[dia] = ""
+            df_grid = pd.DataFrame(data)
+
+    st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
+
+    # ---------------------------
+    # Configura grid editável
+    # ---------------------------
+    gb = GridOptionsBuilder.from_dataframe(df_grid)
+
+    gb.configure_default_column(editable=True, minWidth=80, resizable=True)
+
+    gb.configure_column("Aluno", editable=False, pinned="left", width=250)
+
+    for col in df_grid.columns:
+        if col != "Aluno":
+            gb.configure_column(col, editable=True, width=80)
+
+    grid_options = gb.build()
+
+    grid_response = AgGrid(
+        df_grid,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        fit_columns_on_grid_load=False,
+        height=1000,
+        key="presencas_grid"
+    )
+
+    new_df = grid_response["data"]
+
+    if st.button("Salvar Presenças"):
+        col_presencas.update_one(
+            {"ano": ano, "mes": mes},
+            {"$set": {
+                "ano": ano,
+                "mes": mes,
+                "tabela": new_df.to_dict("records")
+            }},
+            upsert=True
+        )
+        st.success("Presenças salvas com sucesso!")
 
     if st.button("Exportar PDF de Presenças"):
-        pdf_bytes = exportar_pdf_presencas()
+        pdf_bytes = exportar_pdf_presencas(new_df)
         st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
+
+# -------------------------------------------------------
+# PÁGINA DE MENSALIDADES
+# -------------------------------------------------------
 
 def pagina_mensalidades():
     st.header("🥋 空手道 (Karatedō) - Mensalidades Registradas")
@@ -488,117 +659,36 @@ def pagina_mensalidades():
     else:
         st.info("Nenhuma mensalidade registrada.")
 
-        st.header("🥋 空手道 (Karatedō) - Registrar Mensalidade")
-        #with st.form("form_mensalidade"):
-            alunos = list(col_alunos.find())
-            aluno_nomes = [a["nome"] for a in alunos]
-            aluno = st.selectbox("Aluno", aluno_nomes)
-           # calcula o próximo dia 5
-            hoje = datetime.today().date()
-            if hoje.day <= 5:
-                prox_venc = hoje.replace(day=5)
-            else:
-            # pula para o mês seguinte
-                ano = hoje.year + (1 if hoje.month == 12 else 0)
-                mes = 1 if hoje.month == 12 else hoje.month + 1
-                prox_venc = hoje.replace(year=ano, month=mes, day=5)
-            vencimento = st.date_input("Data de Vencimento", value=prox_venc)
-            pago = st.checkbox("Pago?")
-            if st.form_submit_button("Registrar"):
-                col_mensalidades.insert_one({
-                    "aluno": aluno,
-                    "vencimento": str(vencimento),
-                    "pago": pago
-                })
-                st.success("Mensalidade registrada!")
-                st.rerun()
-    
-            if st.button("Exportar PDF de Mensalidades"):
-                pdf_bytes = exportar_pdf_mensalidades()
-            st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-                
-def pagina_grade_presenca():
-    st.subheader("🥋 空手道 (Karatedō) - 📅 Grade de Presenças")
-    from datetime import datetime, timedelta
+    st.header("🥋 空手道 (Karatedō) - Registrar Mensalidade")
+    with st.form("form_mensalidade"):
+        alunos = list(col_alunos.find())
+        aluno_nomes = [a["nome"] for a in alunos]
+        aluno = st.selectbox("Aluno", aluno_nomes)
+       # calcula o próximo dia 5
+        hoje = datetime.today().date()
+        if hoje.day <= 5:
+            prox_venc = hoje.replace(day=5)
+        else:
+        # pula para o mês seguinte
+            ano = hoje.year + (1 if hoje.month == 12 else 0)
+            mes = 1 if hoje.month == 12 else hoje.month + 1
+            prox_venc = hoje.replace(year=ano, month=mes, day=5)
+        vencimento = st.date_input("Data de Vencimento", value=prox_venc)
+        pago = st.checkbox("Pago?")
+        if st.form_submit_button("Registrar"):
+            col_mensalidades.insert_one({
+                "aluno": aluno,
+                "vencimento": str(vencimento),
+                "pago": pago
+            })
+            st.success("Mensalidade registrada!")
+            st.rerun()
 
-    col1, col2 = st.columns(2)
-    with col1:
-        # Crie a função fora do selectbox
-        def nome_mes(x):
-            return datetime(2000, x, 1).strftime("%B")
-
-        mes = st.selectbox(
-            "Selecione o mês",
-            list(range(1, 13)),
-            format_func=nome_mes
-        )
-
-    with col2:
-        ano = st.selectbox(
-            "Selecione o ano",
-            list(range(2025, datetime.now().year + 1))
-        )
-
-    primeiro_dia = datetime(ano, mes, 1)
-    if mes == 12:
-        proximo_mes = datetime(ano + 1, 1, 1)
-    else:
-        proximo_mes = datetime(ano, mes + 1, 1)
-    dias_mes = pd.date_range(start=primeiro_dia, end=proximo_mes - pd.Timedelta(days=1))
-
-    # Buscar alunos ativos
-    alunos_ativos = list(col_alunos.find({"ativo": True}, {"_id": 0, "nome": 1}))
-    nomes_ativos = [a["nome"] for a in alunos_ativos]
-
-    # Buscar todas as presenças (garante nome existe)
-    todas_presencas = list(
-        col_presencas.find(
-            {"nome": {"$exists": True}},
-            {"_id": 0, "nome": 1, "data": 1}
-        )
-    )
-
-    df_presencas = pd.DataFrame(todas_presencas)
-
-    # Filtra as presenças do mês/ano
-    if not df_presencas.empty:
-        df_presencas["data"] = pd.to_datetime(df_presencas["data"], errors='coerce')
-        df_presencas = df_presencas[
-            (df_presencas["data"].dt.month == mes) &
-            (df_presencas["data"].dt.year == ano)
-        ]
-    else:
-        df_presencas = pd.DataFrame(columns=["nome", "data"])
-
-    # Cria grade
-    grid_data = pd.DataFrame({"Aluno": nomes_ativos})
-    for dia in dias_mes:
-        grid_data[dia.day] = ""
-
-    # Marca presença com "X"
-    if not df_presencas.empty and "nome" in df_presencas.columns:
-        for _, row in df_presencas.iterrows():
-            nome = row.get("nome")
-            data = row.get("data")
-
-            if pd.isna(nome) or pd.isna(data):
-                continue
-
-            if nome in nomes_ativos:
-                grid_data.loc[grid_data["Aluno"] == nome, data.day] = "X"
-    else:
-        st.warning("Nenhuma presença encontrada para o período selecionado.")
-
-    # Configura grid
-    gb = GridOptionsBuilder.from_dataframe(grid_data)
-    gb.configure_default_column(resizable=True, width=40)
-    gb.configure_grid_options(domLayout='normal')
-    gridOptions = gb.build()
-
-    st.info(f"Grade de presenças para **{datetime(ano, mes, 1).strftime('%B/%Y')}**")
-
-    AgGrid(grid_data, gridOptions=gridOptions, fit_columns_on_grid_load=True)
-    
+    if st.button("Exportar PDF de Mensalidades"):
+        pdf_bytes = exportar_pdf_mensalidades()
+        st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
+             
+   
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import cm
@@ -654,6 +744,9 @@ def pagina_grade_presenca():
             file_name=f"grade_presenca_{mes}_{ano}.pdf",
             mime="application/pdf",
     )   
+# -------------------------------------------------------
+# PÁGINA DE EXAMES
+# -------------------------------------------------------
 
 def pagina_exames():
     st.header("🥋 空手道 (Karatedō) - Histórico de Exames")
@@ -719,6 +812,10 @@ def pagina_exames():
         pdf_bytes = exportar_pdf_exames()
         st.download_button("Baixar PDF", pdf_bytes, "exames.pdf", "application/pdf")
 
+# -------------------------------------------------------
+# PÁGINA DE EQUIPAMENTOS
+# -------------------------------------------------------
+
 def pagina_equipamentos():
     st.header("🥋 空手道 (Karatedō) - 🎽 Equipamentos")
 
@@ -742,6 +839,10 @@ def pagina_equipamentos():
                 st.rerun()
             else:
                 st.error("Nome do equipamento é obrigatório.")
+
+# -------------------------------------------------------
+# PÁGINA DE EMPRESTIMOS
+# -------------------------------------------------------
 
 def pagina_emprestimos():
     st.title("🥋 空手道 (Karatedō) - 📦 Gerenciamento de Empréstimos")
@@ -905,6 +1006,10 @@ def pagina_emprestimos():
             )
             st.markdown("---")
 
+# -------------------------------------------------------
+# PÁGINA DE ADMIN DO SISTEMA
+# -------------------------------------------------------
+
 def pagina_admin_system():
     st.header("🔐 Administração de Usuários")
 
@@ -978,7 +1083,7 @@ else:
     with col1:
         pagina = st.radio(
            "Menu",
-           ["Alunos", "Presenças", "Grade de Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais", "Sistema"],
+           ["Alunos", "Presenças", "Mensalidades", "Exames", "Empréstimos", "Equipamentos", "Cadastros Gerais", "Sistema"],
            horizontal=True,
            label_visibility="collapsed"
         )
@@ -996,8 +1101,6 @@ else:
         pagina_alunos()
     elif pagina == "Presenças":
         pagina_presencas()
-    elif pagina == "Grade de Presenças":
-        pagina_grade_presenca()
     elif pagina == "Mensalidades":
         pagina_mensalidades()
         enviar_alerta_mensalidade()
