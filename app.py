@@ -554,10 +554,10 @@ import numpy as np
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
 # ------------------------------------
-# client = MongoClient("mongodb://localhost:27017/")
-# db = client["karate"]
-# col_alunos = db["alunos"]
-# col_presencas = db["presencas"]
+client = MongoClient(MONGO_URI)
+db = client["karate"]
+col_alunos = db["alunos"]
+col_presencas = db["presencas"]
 
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
@@ -685,7 +685,7 @@ from pymongo import MongoClient
 import pandas as pd
 
 # Configuração do banco - ajuste sua URI e database
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient(MONGO_URI)
 db = client["karate"]
 col_mensalidades = db["mensalidades"]
 
