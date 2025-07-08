@@ -603,6 +603,10 @@ def pagina_presencas():
 
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
+    # ✅ EVITA ERROS NO AgGrid (converte tudo para string e preenche NaNs)
+    if not df_grid.empty:
+        df_grid = df_grid.fillna("").astype(str)
+
     # ---------------------------
     # Configura grid editável
     # ---------------------------
