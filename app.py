@@ -556,7 +556,7 @@ col_presencas = db["presencas"]
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
-    # Carregar alunos e datas
+    # Carrega lista de alunos
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
 
@@ -571,35 +571,27 @@ def pagina_presencas():
         dias_no_mes.append(dia_atual.strftime("%d/%m"))
         dia_atual += timedelta(days=1)
 
-    registros = list(col_presencas.find({"ano": ano, "mes": mes}))
-    df_presencas = pd.DataFrame(registros)
+    # busca o documento único
+    registro = col_presencas.find_one({"ano": ano, "mes": mes})
 
-    if df_presencas.empty:
+    if registro and registro.get("tabela"):
+        df_grid = pd.DataFrame(registro["tabela"])
+    else:
         # cria grid vazio
         data = {"Aluno": nomes_alunos}
         for dia in dias_no_mes:
             data[dia] = ""
         df_grid = pd.DataFrame(data)
-    else:
-        registro = df_presencas.iloc[0]
-        if "tabela" in registro and registro["tabela"] is not None:
-            df_grid = pd.DataFrame(registro["tabela"])
-        else:
-            st.warning("Documento encontrado, mas sem dados salvos. Exibindo grade vazia.")
-            data = {"Aluno": nomes_alunos}
-            for dia in dias_no_mes:
-                data[dia] = ""
-            df_grid = pd.DataFrame(data)
+
+    # REMOVE CAMPOS PROBLEMÁTICOS
+    df_grid = df_grid.drop(columns=["_id"], errors="ignore")
+    df_grid = df_grid.fillna("")
+    df_grid = df_grid.astype(str)
 
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-    # ---------------------------
-    # Configura grid editável
-    # ---------------------------
     gb = GridOptionsBuilder.from_dataframe(df_grid)
-
     gb.configure_default_column(editable=True, minWidth=80, resizable=True)
-
     gb.configure_column("Aluno", editable=False, pinned="left", width=250)
 
     for col in df_grid.columns:
