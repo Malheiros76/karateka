@@ -554,15 +554,57 @@ import io
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
 # ------------------------------------
-# Exemplo de conexão
+# Exemplo de conexão - DESCOMENTE E AJUSTE:
 # client = MongoClient("mongodb://localhost:27017/")
 # db = client["karate"]
 # col_alunos = db["alunos"]
 # col_presencas = db["presencas"]
 
 # ------------------------------------
+# FUNÇÃO PARA EXPORTAR PDF
+# ------------------------------------
+
+def exportar_pdf_presencas(df):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+
+    largura_pagina, altura_pagina = A4
+
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(40, altura_pagina - 40, "Relatório de Presenças")
+
+    # Cabeçalhos
+    x_pos = 40
+    y_pos = altura_pagina - 70
+
+    # desenhar cabeçalhos
+    for col in df.columns:
+        c.drawString(x_pos, y_pos, str(col))
+        x_pos += 70
+
+    y_pos -= 20
+
+    # desenhar linhas
+    for _, row in df.iterrows():
+        x_pos = 40
+        for item in row:
+            c.drawString(x_pos, y_pos, str(item))
+            x_pos += 70
+        y_pos -= 20
+        if y_pos < 50:
+            c.showPage()
+            y_pos = altura_pagina - 50
+
+    c.save()
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    return pdf
+
+# ------------------------------------
 # FUNÇÃO PRINCIPAL
 # ------------------------------------
+
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
@@ -586,68 +628,7 @@ def pagina_presencas():
 
     if df_presencas.empty:
         # cria grid vazio
-        data = {"Aluno": nomes_alunos}
-        for dia in dias_no_mes:
-            data[dia] = ""
-        df_grid = pd.DataFrame(data)
-    else:
-        registro = df_presencas.iloc[0]
-        if "tabela" in registro and registro["tabela"] is not None:
-            df_grid = pd.DataFrame(registro["tabela"])
-        else:
-            st.warning("Documento encontrado, mas sem dados salvos. Exibindo grade vazia.")
-            data = {"Aluno": nomes_alunos}
-            for dia in dias_no_mes:
-                data[dia] = ""
-            df_grid = pd.DataFrame(data)
-
-    st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
-
-    # ✅ EVITA ERROS NO AgGrid (converte tudo para string e preenche NaNs)
-    if not df_grid.empty:
-        df_grid = df_grid.fillna("").astype(str)
-
-    # ---------------------------
-    # Configura grid editável
-    # ---------------------------
-    gb = GridOptionsBuilder.from_dataframe(df_grid)
-
-    gb.configure_default_column(editable=True, minWidth=80, resizable=True)
-
-    gb.configure_column("Aluno", editable=False, pinned="left", width=250)
-
-    for col in df_grid.columns:
-        if col != "Aluno":
-            gb.configure_column(col, editable=True, width=80)
-
-    grid_options = gb.build()
-
-    grid_response = AgGrid(
-        df_grid,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        fit_columns_on_grid_load=False,
-        height=1000,
-        key="presencas_grid"
-    )
-
-    new_df = grid_response["data"]
-
-    if st.button("Salvar Presenças"):
-        col_presencas.update_one(
-            {"ano": ano, "mes": mes},
-            {"$set": {
-                "ano": ano,
-                "mes": mes,
-                "tabela": new_df.to_dict("records")
-            }},
-            upsert=True
-        )
-        st.success("Presenças salvas com sucesso!")
-
-    if st.button("Exportar PDF de Presenças"):
-        pdf_bytes = exportar_pdf_presencas(new_df)
-        st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
+        data = {"Aluno": nome
 
 # -------------------------------------------------------
 # PÁGINA DE MENSALIDADES
