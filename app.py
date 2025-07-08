@@ -615,13 +615,34 @@ def pagina_presencas():
         pdf_bytes = exportar_pdf_presencas(new_df)
         st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
         
-# -------------------------------------------------------
-# PÁGINA DE MENSALIDADES
-# -------------------------------------------------------
+from datetime import datetime, timedelta
+import streamlit as st
+from pymongo import MongoClient
+import pandas as pd
+import urllib.parse
 
+# -------------------------------
+# BANCO
+# -------------------------------
+client = MongoClient(MONGO_URI)
+db = client["SEU_DATABASE_NAME"]    # ajuste o nome do banco
+col_alunos = db["alunos"]
+col_mensalidades = db["mensalidades"]
+
+# -------------------------------
+# FUNÇÃO
+# -------------------------------
 def pagina_mensalidades():
     st.header("🥋 空手道 (Karatedō) - Mensalidades Registradas")
+
+    # → define hoje ANTES do form
+    hoje = datetime.today().date()
+
+    # -------------------------------
+    # Exibir mensalidades existentes
+    # -------------------------------
     mensalidades = list(col_mensalidades.find().sort("vencimento", -1))
+
     if mensalidades:
         for m in mensalidades:
             pago = "✅" if m.get("pago") else "❌"
@@ -629,23 +650,86 @@ def pagina_mensalidades():
     else:
         st.info("Nenhuma mensalidade registrada.")
 
+    # -------------------------------
+    # Exibir alunos que NÃO pagaram
+    # -------------------------------
+    st.subheader("🚫 Alunos em débito")
+
+    mensalidades_nao_pagas = list(col_mensalidades.find({"pago": False}))
+
+    inadimplentes = []
+
+    for m in mensalidades_nao_pagas:
+        vencimento_str = m.get("vencimento", "")
+        try:
+            vencimento_date = datetime.strptime(vencimento_str, "%Y-%m-%d").date()
+        except:
+            # se estiver salvo como string diferente (p.ex. dd/mm/yyyy)
+            try:
+                vencimento_date = datetime.strptime(vencimento_str, "%d/%m/%Y").date()
+            except:
+                vencimento_date = None
+
+        if vencimento_date and vencimento_date < hoje:
+            # está vencido
+            inadimplentes.append({
+                "aluno": m["aluno"],
+                "vencimento": vencimento_str
+            })
+
+    if inadimplentes:
+        for inad in inadimplentes:
+            aluno_nome = inad["aluno"]
+            venc = inad["vencimento"]
+
+            st.markdown(f"🔴 **{aluno_nome}** - Vencimento: {venc}")
+
+            # buscar telefone do aluno
+            aluno_doc = col_alunos.find_one({"nome": aluno_nome})
+            if aluno_doc and aluno_doc.get("telefone"):
+                telefone = aluno_doc["telefone"]
+            else:
+                telefone = "5511999999999"   # coloque um número padrão ou deixe em branco
+
+            # mensagem personalizada
+            msg = f"Olá {aluno_nome}! Sua mensalidade venceu em {venc}. Poderia regularizar, por favor?"
+            msg_url = urllib.parse.quote(msg)
+
+            # gerar link WhatsApp
+            link_whatsapp = f"https://wa.me/{telefone}?text={msg_url}"
+
+            st.markdown(f"[📲 Enviar WhatsApp]({link_whatsapp})", unsafe_allow_html=True)
+            st.write("---")
+
+    else:
+        st.success("Nenhum aluno inadimplente!")
+
+    # -------------------------------
+    # Formulário para registrar nova mensalidade
+    # -------------------------------
     st.header("🥋 空手道 (Karatedō) - Registrar Mensalidade")
+
     with st.form("form_mensalidade"):
         alunos = list(col_alunos.find())
         aluno_nomes = [a["nome"] for a in alunos]
+
         aluno = st.selectbox("Aluno", aluno_nomes)
-       # calcula o próximo dia 5
-        hoje = datetime.today().date()
+
+        # calcula o próximo dia 5
         if hoje.day <= 5:
             prox_venc = hoje.replace(day=5)
         else:
-        # pula para o mês seguinte
+            # pula para o mês seguinte
             ano = hoje.year + (1 if hoje.month == 12 else 0)
             mes = 1 if hoje.month == 12 else hoje.month + 1
             prox_venc = hoje.replace(year=ano, month=mes, day=5)
+
         vencimento = st.date_input("Data de Vencimento", value=prox_venc)
         pago = st.checkbox("Pago?")
-        if st.form_submit_button("Registrar"):
+
+        submit = st.form_submit_button("Registrar")
+
+        if submit:
             col_mensalidades.insert_one({
                 "aluno": aluno,
                 "vencimento": str(vencimento),
@@ -654,66 +738,13 @@ def pagina_mensalidades():
             st.success("Mensalidade registrada!")
             st.rerun()
 
+    # -------------------------------
+    # Botão de exportar PDF
+    # -------------------------------
     if st.button("Exportar PDF de Mensalidades"):
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-             
-   
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.units import cm
-    from reportlab.lib import colors
-    from reportlab.platypus import Table, TableStyle
-    import io
-    from datetime import datetime
 
-    def gerar_pdf_grade(df, mes, ano):
-        buffer = io.BytesIO()
-        
-        # Cria PDF em paisagem
-        c = canvas.Canvas(buffer, pagesize=landscape(A4))
-        
-        # Título
-        c.setFont("Helvetica-Bold", 16)
-        titulo = f"Grade de Presença - {datetime(ano, mes, 1).strftime('%B/%Y')}"
-        c.drawString(2 * cm, 19 * cm, titulo)
-        
-        # Prepara dados para tabela
-        data = [list(df.columns)] + df.astype(str).values.tolist()
-        
-        # Cria tabela do reportlab
-        table = Table(data, repeatRows=1, colWidths=[3*cm] + [1.2*cm]*(len(df.columns)-1))
-        
-        # Estilo da tabela
-        style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
-        ])
-        table.setStyle(style)
-        
-        # Posiciona tabela
-        table.wrapOn(c, 20*cm, 15*cm)
-        table.drawOn(c, 2 * cm, 2 * cm)
-        
-        c.save()
-        pdf = buffer.getvalue()
-        buffer.close()
-        return pdf
-
-        # --- PDF Download ---
-        pdf_bytes = gerar_pdf_grade(grid_data, mes, ano)
-
-        st.download_button(
-            label="📄 Baixar Relatório em PDF",
-            data=pdf_bytes,
-            file_name=f"grade_presenca_{mes}_{ano}.pdf",
-            mime="application/pdf",
-    )   
 # -------------------------------------------------------
 # PÁGINA DE EXAMES
 # -------------------------------------------------------
