@@ -541,7 +541,6 @@ def pagina_alunos():
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
 # -------------------------------------------------------
-
 from datetime import datetime, timedelta
 import streamlit as st
 from pymongo import MongoClient
@@ -555,19 +554,14 @@ import numpy as np
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
 # ------------------------------------
-# Exemplo de conexão
 # client = MongoClient("mongodb://localhost:27017/")
 # db = client["karate"]
 # col_alunos = db["alunos"]
 # col_presencas = db["presencas"]
 
-# ------------------------------------
-# FUNÇÃO PRINCIPAL
-# ------------------------------------
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
-    # Carregar alunos e datas
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
 
@@ -586,7 +580,7 @@ def pagina_presencas():
     df_presencas = pd.DataFrame(registros)
 
     if df_presencas.empty:
-        # cria grid vazio
+        # cria grade vazia
         data = {"Aluno": nomes_alunos}
         for dia in dias_no_mes:
             data[dia] = ""
@@ -603,90 +597,87 @@ def pagina_presencas():
             df_grid = pd.DataFrame(data)
 
     # ---------------------------------------------------------
-    # GARANTIR SEGURANÇA DOS DADOS PARA O AgGrid
+    # VALIDAÇÃO E PREPARAÇÃO DO DATAFRAME PARA AgGrid
     # ---------------------------------------------------------
 
-    # Garante que todas as colunas existam
+    df_grid.reset_index(drop=True, inplace=True)
+
+    # Renomeia coluna mal formatada se necessário
+    if 0 in df_grid.columns:
+        st.warning("Corrigindo coluna inválida chamada '0'")
+        df_grid = df_grid.rename(columns={0: "Aluno"})
+
+    # Força que "Aluno" exista
+    if "Aluno" not in df_grid.columns:
+        col_candidatas = [col for col in df_grid.columns if isinstance(col, str) and "nome" in col.lower()]
+        if col_candidatas:
+            df_grid = df_grid.rename(columns={col_candidatas[0]: "Aluno"})
+
     colunas_esperadas = ["Aluno"] + dias_no_mes
     for col in colunas_esperadas:
         if col not in df_grid.columns:
             df_grid[col] = ""
 
-    # Remove linhas totalmente vazias
-    df_grid = df_grid.dropna(how="all")
+    df_grid = df_grid.dropna(how="all").fillna("")
 
-    # Preenche NaNs
-    df_grid = df_grid.fillna("")
-
-    # Converte listas/dicionários/arrays em string
     for col in df_grid.columns:
         if df_grid[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
             df_grid[col] = df_grid[col].apply(str)
 
-    # Checa se há funções no DataFrame (causa MarshallComponentException)
     for col in df_grid.columns:
         if df_grid[col].apply(lambda x: callable(x)).any():
-            st.error(f"ERRO: A coluna '{col}' contém função. Remova funções do DataFrame.")
+            st.error(f"🛑 ERRO: A coluna '{col}' contém função. Isso quebra o AgGrid.")
             st.stop()
-
-    # Se DataFrame estiver completamente vazio (0 colunas), recria as colunas esperadas
-    if df_grid.shape[1] == 0:
-        df_grid = pd.DataFrame(columns=colunas_esperadas)
-
-    # Checa tipos
-    st.write("Tipos das colunas:", df_grid.dtypes)
-    st.write("Exemplo de dados:", df_grid.head())
 
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
     if df_grid.empty:
-        st.info("Nenhum dado para exibir na grade.")
-    else:
-        # ---------------------------
-        # Configura grid editável
-        # ---------------------------
-        gb = GridOptionsBuilder.from_dataframe(df_grid)
+        st.info("Nenhum dado para exibir.")
+        return
 
-        gb.configure_default_column(editable=True, minWidth=80, resizable=True)
+    # ---------------------------
+    # CONFIGURAÇÃO DO GRID
+    # ---------------------------
+    gb = GridOptionsBuilder.from_dataframe(df_grid)
+    gb.configure_default_column(editable=True, minWidth=80, resizable=True)
+    gb.configure_column("Aluno", editable=False, pinned="left", width=250)
 
-        gb.configure_column("Aluno", editable=False, pinned="left", width=250)
+    for col in df_grid.columns:
+        if col != "Aluno":
+            gb.configure_column(col, editable=True, width=80)
 
-        for col in df_grid.columns:
-            if col != "Aluno":
-                gb.configure_column(col, editable=True, width=80)
+    grid_options = gb.build()
 
-        grid_options = gb.build()
+    try:
+        grid_response = AgGrid(
+            df_grid,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.VALUE_CHANGED,
+            fit_columns_on_grid_load=False,
+            height=1000,
+            key="presencas_grid"
+        )
+    except Exception as e:
+        st.error(f"Erro ao renderizar AgGrid: {e}")
+        st.stop()
 
-        try:
-            grid_response = AgGrid(
-                df_grid,
-                gridOptions=grid_options,
-                update_mode=GridUpdateMode.VALUE_CHANGED,
-                fit_columns_on_grid_load=False,
-                height=1000,
-                key="presencas_grid"
-            )
-        except Exception as e:
-            st.error(f"Erro ao renderizar AgGrid: {e}")
-            st.stop()
+    new_df = grid_response["data"]
 
-        new_df = grid_response["data"]
+    if st.button("Salvar Presenças"):
+        col_presencas.update_one(
+            {"ano": ano, "mes": mes},
+            {"$set": {
+                "ano": ano,
+                "mes": mes,
+                "tabela": new_df.to_dict("records")
+            }},
+            upsert=True
+        )
+        st.success("Presenças salvas com sucesso!")
 
-        if st.button("Salvar Presenças"):
-            col_presencas.update_one(
-                {"ano": ano, "mes": mes},
-                {"$set": {
-                    "ano": ano,
-                    "mes": mes,
-                    "tabela": new_df.to_dict("records")
-                }},
-                upsert=True
-            )
-            st.success("Presenças salvas com sucesso!")
-
-        if st.button("Exportar PDF de Presenças"):
-            pdf_bytes = exportar_pdf_presencas(new_df)
-            st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
+    if st.button("Exportar PDF de Presenças"):
+        pdf_bytes = exportar_pdf_presencas(new_df)
+        st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
 
 # -------------------------------------------------------
 # PÁGINA DE MENSALIDADES
@@ -730,8 +721,7 @@ def pagina_mensalidades():
     if st.button("Exportar PDF de Mensalidades"):
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-             
-   
+      
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import cm
