@@ -1,29 +1,21 @@
 import streamlit as st
+import io
+import urllib.parse
+import bcrypt
+import pandas as pd
 from pymongo import MongoClient
 from datetime import datetime
 from bson.objectid import ObjectId
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
-import io
 from dateutil.relativedelta import relativedelta
-import urllib.parse
 from datetime import datetime, timedelta
-import bcrypt
-import pandas as pd
 from datetime import datetime
 from st_aggrid import AgGrid, GridOptionsBuilder
-import streamlit as st
-from datetime import datetime
-from pymongo import MongoClient
 from bson import ObjectId
 from PIL import Image
-import io
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
-
 
 # --- Inicialização segura do session_state ---
 
