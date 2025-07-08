@@ -762,6 +762,7 @@ def pagina_mensalidades():
             })
             st.success("Mensalidade registrada!")
             st.rerun()
+
 # -------------------------------------------------------
 # PÁGINA DE EXAMES
 # -------------------------------------------------------
@@ -830,66 +831,6 @@ def pagina_exames():
         pdf_bytes = exportar_pdf_exames()
         st.download_button("Baixar PDF", pdf_bytes, "exames.pdf", "application/pdf")
 
-# -------------------------------------------------------
-# PÁGINA DE EQUIPAMENTOS
-# -------------------------------------------------------
-
-def pagina_equipamentos():
-    st.header("🥋 空手道 (Karatedō) - 🎽 Equipamentos")
-
-    equipamentos = list(col_equipamentos.find())
-    if equipamentos:
-        for eq in equipamentos:
-            nome = eq.get('nome', 'Sem nome')
-            quantidade = eq.get('quantidade', 0)
-            st.markdown(f"**{nome}** - Quantidade: {quantidade}")
-    else:
-        st.info("Nenhum equipamento cadastrado.")
-
-    st.header("🥋 空手道 (Karatedō) - Adicionar Equipamento")
-    with st.form("form_equipamento"):
-        nome = st.text_input("Nome do Equipamento")
-        quantidade = st.number_input("Quantidade", min_value=0, step=1)
-        if st.form_submit_button("Adicionar"):
-            if nome:
-                col_equipamentos.insert_one({"nome": nome, "quantidade": quantidade})
-                st.success("Equipamento adicionado!")
-                st.rerun()
-            else:
-                st.error("Nome do equipamento é obrigatório.")
-
-# -------------------------------------------------------
-# PÁGINA DE EQUIPAMENTOS
-# -------------------------------------------------------
-
-def pagina_equipamentos():
-    st.header("🥋 空手道 (Karatedō) - 🎽 Equipamentos")
-
-    equipamentos = list(col_equipamentos.find())
-    if equipamentos:
-        for eq in equipamentos:
-            nome = eq.get('nome', 'Sem nome')
-            quantidade = eq.get('quantidade', 0)
-            st.markdown(f"**{nome}** - Quantidade: {quantidade}")
-    else:
-        st.info("Nenhum equipamento cadastrado.")
-
-    st.header("🥋 空手道 (Karatedō) - Adicionar Equipamento")
-    with st.form("form_equipamento"):
-        nome = st.text_input("Nome do Equipamento")
-        quantidade = st.number_input("Quantidade", min_value=0, step=1)
-        if st.form_submit_button("Adicionar"):
-            if nome:
-                col_equipamentos.insert_one({"nome": nome, "quantidade": quantidade})
-                st.success("Equipamento adicionado!")
-                st.rerun()
-            else:
-                st.error("Nome do equipamento é obrigatório.")
-
-# -------------------------------------------------------
-# PÁGINA DE EMPRESTIMOS
-# -------------------------------------------------------
-
 def pagina_emprestimos():
     st.title("🥋 空手道 (Karatedō) - 📦 Gerenciamento de Empréstimos")
 
@@ -908,14 +849,12 @@ def pagina_emprestimos():
             estado = st.selectbox("Estado", ["Novo", "Bom", "Regular", "Ruim"])
 
         with col2:
-            # Mostrar o campo Cor da Faixa só se o tipo for Faixa
             cor_faixa = None
             if tipo.lower() == "faixa":
                 cor_faixa = st.selectbox("Cor da Faixa", 
                     ["Branca", "Cinza", "Azul", "Amarela", "Vermelha", "Laranja", "Verde", "Roxa", "Marrom", "Preta"])
 
         if st.button("Cadastrar Equipamento"):
-            # Validar campos
             if not codigo.strip():
                 st.error("Informe o código do equipamento.")
             else:
@@ -928,7 +867,6 @@ def pagina_emprestimos():
                 if cor_faixa:
                     equip_doc["cor_faixa"] = cor_faixa
 
-                # Verifica se código já existe
                 existe = col_equipamentos.find_one({"codigo": equip_doc["codigo"]})
                 if existe:
                     st.error("Já existe um equipamento com esse código.")
@@ -944,12 +882,11 @@ def pagina_emprestimos():
         alunos = list(col_alunos.find())
         equipamentos = list(col_equipamentos.find({"estado": {"$in": ["Novo", "Bom", "Regular"]}}))
 
-        # Filtrar equipamentos disponíveis (não emprestados ou devolvidos)
         emprestados_ids = [e['equipamento_id'] for e in col_emprestimos.find({"devolvido": False})]
         equipamentos_disponiveis = [eq for eq in equipamentos if eq["_id"] not in emprestados_ids]
 
-        nomes_alunos = [a["nome"] for a in alunos]
-        nomes_equip = [f"{eq['tipo']} ({eq['codigo']})" for eq in equipamentos_disponiveis]
+        nomes_alunos = [a.get("nome", "Sem nome") for a in alunos]
+        nomes_equip = [f"{eq.get('tipo', 'Tipo?')} ({eq.get('codigo', 'Código?')})" for eq in equipamentos_disponiveis]
 
         aluno_sel = st.selectbox("Aluno", [""] + nomes_alunos)
         equipamento_sel = st.selectbox("Equipamento Disponível", [""] + nomes_equip)
@@ -966,9 +903,8 @@ def pagina_emprestimos():
             elif data_devolucao < data_emprestimo:
                 st.error("Data de devolução não pode ser anterior à data do empréstimo.")
             else:
-                # Encontrar ids dos documentos
-                aluno_doc = next((a for a in alunos if a["nome"] == aluno_sel), None)
-                equipamento_doc = next((eq for eq in equipamentos_disponiveis if f"{eq['tipo']} ({eq['codigo']})" == equipamento_sel), None)
+                aluno_doc = next((a for a in alunos if a.get("nome") == aluno_sel), None)
+                equipamento_doc = next((eq for eq in equipamentos_disponiveis if f"{eq.get('tipo', 'Tipo?')} ({eq.get('codigo', 'Código?')})" == equipamento_sel), None)
 
                 if not aluno_doc or not equipamento_doc:
                     st.error("Erro ao localizar aluno ou equipamento.")
@@ -996,19 +932,24 @@ def pagina_emprestimos():
         st.info("Nenhum empréstimo ativo no momento.")
     else:
         for emp in emprestimos_ativos:
-            col1, col2 = st.columns([7,1])
+            col1, col2, col3 = st.columns([6,1,1])
             with col1:
                 st.markdown(
-                    f"**Aluno:** {emp['aluno']}  \n"
-                    f"**Equipamento:** {emp['equipamento']}  \n"
-                    f"**Data Empréstimo:** {emp['data_emprestimo']}  \n"
-                    f"**Previsão Devolução:** {emp['data_devolucao']}  \n"
+                    f"**Aluno:** {emp.get('aluno', 'Sem nome')}  \n"
+                    f"**Equipamento:** {emp.get('equipamento', 'Sem equipamento')}  \n"
+                    f"**Data Empréstimo:** {emp.get('data_emprestimo', 'N/A')}  \n"
+                    f"**Previsão Devolução:** {emp.get('data_devolucao', 'N/A')}  \n"
                     f"**Observações:** {emp.get('observacoes','')}"
                 )
             with col2:
-                if st.button(f"Registrar Devolução - {emp['aluno']} - {emp['equipamento']}", key=f"dev_{emp['_id']}"):
+                if st.button(f"Registrar Devolução", key=f"dev_{emp['_id']}"):
                     col_emprestimos.update_one({"_id": emp["_id"]}, {"$set": {"devolvido": True}})
-                    st.success(f"Devolução registrada para {emp['aluno']}.")
+                    st.success(f"Devolução registrada para {emp.get('aluno', '')}.")
+                    st.experimental_rerun()
+            with col3:
+                if st.button(f"Excluir", key=f"del_emp_{emp['_id']}"):
+                    col_emprestimos.delete_one({"_id": emp["_id"]})
+                    st.success("Empréstimo excluído.")
                     st.experimental_rerun()
 
     st.markdown("---")
@@ -1023,10 +964,10 @@ def pagina_emprestimos():
         for emp in emprestimos_todos:
             status = "✅ Devolvido" if emp.get("devolvido", False) else "❌ Em aberto"
             st.markdown(
-                f"**Aluno:** {emp['aluno']}  \n"
-                f"**Equipamento:** {emp['equipamento']}  \n"
-                f"**Data Empréstimo:** {emp['data_emprestimo']}  \n"
-                f"**Data Devolução Prevista:** {emp['data_devolucao']}  \n"
+                f"**Aluno:** {emp.get('aluno', 'Sem nome')}  \n"
+                f"**Equipamento:** {emp.get('equipamento', 'Sem equipamento')}  \n"
+                f"**Data Empréstimo:** {emp.get('data_emprestimo', 'N/A')}  \n"
+                f"**Data Devolução Prevista:** {emp.get('data_devolucao', 'N/A')}  \n"
                 f"**Observações:** {emp.get('observacoes','')}  \n"
                 f"**Status:** {status}"
             )
@@ -1044,15 +985,28 @@ def pagina_emprestimos():
         for eq in equipamentos_todos:
             cor_faixa = eq.get("cor_faixa", "")
             faixa_info = f" | Cor Faixa: {cor_faixa}" if cor_faixa else ""
-            st.markdown(
-                f"**Tipo:** {eq['tipo']}  \n"
-                f"**Tamanho:** {eq['tamanho']}  \n"
-                f"**Código:** {eq['codigo']}  \n"
-                f"**Estado:** {eq['estado']}{faixa_info}"
-            )
+
+            tipo = eq.get('tipo', 'Tipo não informado')
+            tamanho = eq.get('tamanho', 'Tamanho não informado')
+            codigo = eq.get('codigo', 'Código não informado')
+            estado = eq.get('estado', 'Estado não informado')
+
+            col1, col2 = st.columns([7,1])
+            with col1:
+                st.markdown(
+                    f"**Tipo:** {tipo}  \n"
+                    f"**Tamanho:** {tamanho}  \n"
+                    f"**Código:** {codigo}  \n"
+                    f"**Estado:** {estado}{faixa_info}"
+                )
+            with col2:
+                if st.button(f"Excluir Equipamento - {codigo}", key=f"del_eq_{eq['_id']}"):
+                    col_equipamentos.delete_one({"_id": eq["_id"]})
+                    st.success(f"Equipamento {codigo} excluído.")
+                    st.experimental_rerun()
             st.markdown("---")
 
-# -------------------------------------------------------
+ -------------------------------------------------------
 # PÁGINA DE ADMIN DO SISTEMA
 # -------------------------------------------------------
 
