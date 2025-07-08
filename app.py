@@ -993,15 +993,21 @@ def pagina_emprestimos():
         st.info("Nenhum equipamento cadastrado.")
     else:
         for eq in equipamentos_todos:
-            cor_faixa = eq.get("cor_faixa", "")
-            faixa_info = f" | Cor Faixa: {cor_faixa}" if cor_faixa else ""
-            st.markdown(
-                f"**Tipo:** {eq['tipo']}  \n"
-                f"**Tamanho:** {eq['tamanho']}  \n"
-                f"**Código:** {eq['codigo']}  \n"
-                f"**Estado:** {eq['estado']}{faixa_info}"
-            )
-            st.markdown("---")
+    tipo = eq.get("tipo", "Desconhecido")
+    tamanho = eq.get("tamanho", "N/A")
+    codigo = eq.get("codigo", "N/A")
+    estado = eq.get("estado", "N/A")
+    cor_faixa = eq.get("cor_faixa", "")
+
+    faixa_info = f" | Cor Faixa: {cor_faixa}" if cor_faixa else ""
+    
+    st.markdown(
+        f"**Tipo:** {tipo}  \n"
+        f"**Tamanho:** {tamanho}  \n"
+        f"**Código:** {codigo}  \n"
+        f"**Estado:** {estado}{faixa_info}"
+    )
+    st.markdown("---")
 
 # -------------------------------------------------------
 # PÁGINA DE ADMIN DO SISTEMA
