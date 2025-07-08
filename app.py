@@ -739,10 +739,6 @@ def main():
         pagina_mensalidades()
     elif pagina == "Listar Mensalidades":
         listar_mensalidades()
-
-if __name__ == "__main__":
-    main()
-
 # -------------------------------------------------------
 # PÁGINA DE EXAMES
 # -------------------------------------------------------
