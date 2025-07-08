@@ -550,6 +550,7 @@ import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 import io
+import numpy as np
 
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
@@ -601,49 +602,81 @@ def pagina_presencas():
                 data[dia] = ""
             df_grid = pd.DataFrame(data)
 
+    # ---------------------------------------------------------
+    # GARANTIR SEGURANÇA DOS DADOS PARA O AgGrid
+    # ---------------------------------------------------------
+
+    # Garante que todas as colunas existam
+    colunas_esperadas = ["Aluno"] + dias_no_mes
+    for col in colunas_esperadas:
+        if col not in df_grid.columns:
+            df_grid[col] = ""
+
+    # Remove linhas totalmente vazias
+    df_grid = df_grid.dropna(how="all")
+
+    # Preenche NaNs
+    df_grid = df_grid.fillna("")
+
+    # Converte listas/dicionários/arrays em string
+    for col in df_grid.columns:
+        if df_grid[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
+            df_grid[col] = df_grid[col].apply(str)
+
+    # Se DataFrame estiver completamente vazio (0 colunas), recria as colunas esperadas
+    if df_grid.shape[1] == 0:
+        df_grid = pd.DataFrame(columns=colunas_esperadas)
+
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-    # ---------------------------
-    # Configura grid editável
-    # ---------------------------
-    gb = GridOptionsBuilder.from_dataframe(df_grid)
+    if df_grid.empty:
+        st.info("Nenhum dado para exibir na grade.")
+    else:
+        # ---------------------------
+        # Configura grid editável
+        # ---------------------------
+        gb = GridOptionsBuilder.from_dataframe(df_grid)
 
-    gb.configure_default_column(editable=True, minWidth=80, resizable=True)
+        gb.configure_default_column(editable=True, minWidth=80, resizable=True)
 
-    gb.configure_column("Aluno", editable=False, pinned="left", width=250)
+        gb.configure_column("Aluno", editable=False, pinned="left", width=250)
 
-    for col in df_grid.columns:
-        if col != "Aluno":
-            gb.configure_column(col, editable=True, width=80)
+        for col in df_grid.columns:
+            if col != "Aluno":
+                gb.configure_column(col, editable=True, width=80)
 
-    grid_options = gb.build()
+        grid_options = gb.build()
 
-    grid_response = AgGrid(
-        df_grid,
-        gridOptions=grid_options,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        fit_columns_on_grid_load=False,
-        height=1000,
-        key="presencas_grid"
-    )
+        try:
+            grid_response = AgGrid(
+                df_grid,
+                gridOptions=grid_options,
+                update_mode=GridUpdateMode.VALUE_CHANGED,
+                fit_columns_on_grid_load=False,
+                height=1000,
+                key="presencas_grid"
+            )
+        except Exception as e:
+            st.error(f"Erro ao renderizar AgGrid: {e}")
+            st.stop()
 
-    new_df = grid_response["data"]
+        new_df = grid_response["data"]
 
-    if st.button("Salvar Presenças"):
-        col_presencas.update_one(
-            {"ano": ano, "mes": mes},
-            {"$set": {
-                "ano": ano,
-                "mes": mes,
-                "tabela": new_df.to_dict("records")
-            }},
-            upsert=True
-        )
-        st.success("Presenças salvas com sucesso!")
+        if st.button("Salvar Presenças"):
+            col_presencas.update_one(
+                {"ano": ano, "mes": mes},
+                {"$set": {
+                    "ano": ano,
+                    "mes": mes,
+                    "tabela": new_df.to_dict("records")
+                }},
+                upsert=True
+            )
+            st.success("Presenças salvas com sucesso!")
 
-    if st.button("Exportar PDF de Presenças"):
-        pdf_bytes = exportar_pdf_presencas(new_df)
-        st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
+        if st.button("Exportar PDF de Presenças"):
+            pdf_bytes = exportar_pdf_presencas(new_df)
+            st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
 
 # -------------------------------------------------------
 # PÁGINA DE MENSALIDADES
