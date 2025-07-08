@@ -622,6 +622,9 @@ import pandas as pd
 import urllib.parse
 
 # -------------------------------
+# Pagina Mensalidades
+# -------------------------------
+# -------------------------------
 # BANCO
 # -------------------------------
 client = MongoClient(MONGO_URI)
@@ -1104,7 +1107,7 @@ else:
         pagina_presencas()
     elif pagina == "Mensalidades":
         pagina_mensalidades()
-        enviar_alerta_mensalidade()
+        #enviar_alerta_mensalidade()
     elif pagina == "Exames":
         pagina_exames()
     elif pagina == "Empréstimos":
