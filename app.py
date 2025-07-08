@@ -546,11 +546,9 @@ import io
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
 # ------------------------------------
-# Exemplo de conexão
-# client = MongoClient("mongodb://localhost:27017/")
-# db = client["karate"]
-# col_alunos = db["alunos"]
-# col_presencas = db["presencas"]
+client = MongoClient(MONGO_URI)
+col_alunos = db["alunos"]
+col_presencas = db["presencas"]
 
 # ------------------------------------
 # FUNÇÃO PRINCIPAL
