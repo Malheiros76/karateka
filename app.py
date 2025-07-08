@@ -628,7 +628,7 @@ def pagina_presencas():
 
     if df_presencas.empty:
         # cria grid vazio
-        data = {"Aluno": nome
+        data = {"Aluno": nome}
 
 # -------------------------------------------------------
 # PÁGINA DE MENSALIDADES
