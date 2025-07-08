@@ -541,6 +541,7 @@ def pagina_alunos():
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
 # -------------------------------------------------------
+
 from datetime import datetime, timedelta
 import streamlit as st
 from pymongo import MongoClient
@@ -549,19 +550,23 @@ import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 import io
-import numpy as np
 
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
 # ------------------------------------
+# Exemplo de conexão
 # client = MongoClient("mongodb://localhost:27017/")
 # db = client["karate"]
 # col_alunos = db["alunos"]
 # col_presencas = db["presencas"]
 
+# ------------------------------------
+# FUNÇÃO PRINCIPAL
+# ------------------------------------
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
+    # Carregar alunos e datas
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
 
@@ -580,7 +585,7 @@ def pagina_presencas():
     df_presencas = pd.DataFrame(registros)
 
     if df_presencas.empty:
-        # cria grade vazia
+        # cria grid vazio
         data = {"Aluno": nomes_alunos}
         for dia in dias_no_mes:
             data[dia] = ""
@@ -596,50 +601,15 @@ def pagina_presencas():
                 data[dia] = ""
             df_grid = pd.DataFrame(data)
 
-    # ---------------------------------------------------------
-    # VALIDAÇÃO E PREPARAÇÃO DO DATAFRAME PARA AgGrid
-    # ---------------------------------------------------------
-
-    df_grid.reset_index(drop=True, inplace=True)
-
-    # Renomeia coluna mal formatada se necessário
-    if 0 in df_grid.columns:
-        st.warning("Corrigindo coluna inválida chamada '0'")
-        df_grid = df_grid.rename(columns={0: "Aluno"})
-
-    # Força que "Aluno" exista
-    if "Aluno" not in df_grid.columns:
-        col_candidatas = [col for col in df_grid.columns if isinstance(col, str) and "nome" in col.lower()]
-        if col_candidatas:
-            df_grid = df_grid.rename(columns={col_candidatas[0]: "Aluno"})
-
-    colunas_esperadas = ["Aluno"] + dias_no_mes
-    for col in colunas_esperadas:
-        if col not in df_grid.columns:
-            df_grid[col] = ""
-
-    df_grid = df_grid.dropna(how="all").fillna("")
-
-    for col in df_grid.columns:
-        if df_grid[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
-            df_grid[col] = df_grid[col].apply(str)
-
-    for col in df_grid.columns:
-        if df_grid[col].apply(lambda x: callable(x)).any():
-            st.error(f"🛑 ERRO: A coluna '{col}' contém função. Isso quebra o AgGrid.")
-            st.stop()
-
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-    if df_grid.empty:
-        st.info("Nenhum dado para exibir.")
-        return
-
     # ---------------------------
-    # CONFIGURAÇÃO DO GRID
+    # Configura grid editável
     # ---------------------------
     gb = GridOptionsBuilder.from_dataframe(df_grid)
+
     gb.configure_default_column(editable=True, minWidth=80, resizable=True)
+
     gb.configure_column("Aluno", editable=False, pinned="left", width=250)
 
     for col in df_grid.columns:
@@ -648,18 +618,14 @@ def pagina_presencas():
 
     grid_options = gb.build()
 
-    try:
-        grid_response = AgGrid(
-            df_grid,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.VALUE_CHANGED,
-            fit_columns_on_grid_load=False,
-            height=1000,
-            key="presencas_grid"
-        )
-    except Exception as e:
-        st.error(f"Erro ao renderizar AgGrid: {e}")
-        st.stop()
+    grid_response = AgGrid(
+        df_grid,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        fit_columns_on_grid_load=False,
+        height=1000,
+        key="presencas_grid"
+    )
 
     new_df = grid_response["data"]
 
@@ -721,7 +687,8 @@ def pagina_mensalidades():
     if st.button("Exportar PDF de Mensalidades"):
         pdf_bytes = exportar_pdf_mensalidades()
         st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
-      
+             
+   
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import cm
