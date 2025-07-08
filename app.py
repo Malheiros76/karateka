@@ -533,6 +533,7 @@ def pagina_alunos():
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
 # -------------------------------------------------------
+
 from datetime import datetime, timedelta
 import streamlit as st
 from pymongo import MongoClient
@@ -541,19 +542,23 @@ import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 import io
-import numpy as np
 
 # ------------------------------------
 # CONFIGURAÇÃO DO BANCO
 # ------------------------------------
-client = MongoClient(MONGO_URI)
-db = client["karate"]
-col_alunos = db["alunos"]
-col_presencas = db["presencas"]
+# Exemplo de conexão
+# client = MongoClient("mongodb://localhost:27017/")
+# db = client["karate"]
+# col_alunos = db["alunos"]
+# col_presencas = db["presencas"]
 
+# ------------------------------------
+# FUNÇÃO PRINCIPAL
+# ------------------------------------
 def pagina_presencas():
     st.header("🥋 空手道 (Karatedō) - Presenças")
 
+    # Carregar alunos e datas
     alunos = list(col_alunos.find())
     nomes_alunos = [a["nome"] for a in alunos]
 
@@ -572,7 +577,7 @@ def pagina_presencas():
     df_presencas = pd.DataFrame(registros)
 
     if df_presencas.empty:
-        # cria grade vazia
+        # cria grid vazio
         data = {"Aluno": nomes_alunos}
         for dia in dias_no_mes:
             data[dia] = ""
@@ -588,50 +593,15 @@ def pagina_presencas():
                 data[dia] = ""
             df_grid = pd.DataFrame(data)
 
-    # ---------------------------------------------------------
-    # VALIDAÇÃO E PREPARAÇÃO DO DATAFRAME PARA AgGrid
-    # ---------------------------------------------------------
-
-    df_grid.reset_index(drop=True, inplace=True)
-
-    # Renomeia coluna mal formatada se necessário
-    if 0 in df_grid.columns:
-        st.warning("Corrigindo coluna inválida chamada '0'")
-        df_grid = df_grid.rename(columns={0: "Aluno"})
-
-    # Força que "Aluno" exista
-    if "Aluno" not in df_grid.columns:
-        col_candidatas = [col for col in df_grid.columns if isinstance(col, str) and "nome" in col.lower()]
-        if col_candidatas:
-            df_grid = df_grid.rename(columns={col_candidatas[0]: "Aluno"})
-
-    colunas_esperadas = ["Aluno"] + dias_no_mes
-    for col in colunas_esperadas:
-        if col not in df_grid.columns:
-            df_grid[col] = ""
-
-    df_grid = df_grid.dropna(how="all").fillna("")
-
-    for col in df_grid.columns:
-        if df_grid[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
-            df_grid[col] = df_grid[col].apply(str)
-
-    for col in df_grid.columns:
-        if df_grid[col].apply(lambda x: callable(x)).any():
-            st.error(f"🛑 ERRO: A coluna '{col}' contém função. Isso quebra o AgGrid.")
-            st.stop()
-
     st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-    if df_grid.empty:
-        st.info("Nenhum dado para exibir.")
-        return
-
     # ---------------------------
-    # CONFIGURAÇÃO DO GRID
+    # Configura grid editável
     # ---------------------------
     gb = GridOptionsBuilder.from_dataframe(df_grid)
+
     gb.configure_default_column(editable=True, minWidth=80, resizable=True)
+
     gb.configure_column("Aluno", editable=False, pinned="left", width=250)
 
     for col in df_grid.columns:
@@ -640,18 +610,14 @@ def pagina_presencas():
 
     grid_options = gb.build()
 
-    try:
-        grid_response = AgGrid(
-            df_grid,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.VALUE_CHANGED,
-            fit_columns_on_grid_load=False,
-            height=1000,
-            key="presencas_grid"
-        )
-    except Exception as e:
-        st.error(f"Erro ao renderizar AgGrid: {e}")
-        st.stop()
+    grid_response = AgGrid(
+        df_grid,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        fit_columns_on_grid_load=False,
+        height=1000,
+        key="presencas_grid"
+    )
 
     new_df = grid_response["data"]
 
@@ -671,66 +637,105 @@ def pagina_presencas():
         pdf_bytes = exportar_pdf_presencas(new_df)
         st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
 
-from datetime import datetime
-import streamlit as st
-from pymongo import MongoClient
-import pandas as pd
-
-# Configuração do banco - ajuste sua URI e database
-client = MongoClient(MONGO_URI)
-db = client["karate"]
-col_mensalidades = db["mensalidades"]
+# -------------------------------------------------------
+# PÁGINA DE MENSALIDADES
+# -------------------------------------------------------
 
 def pagina_mensalidades():
-    st.header("🥋 空手道 (Karatedō) - Cadastro de Mensalidades")
+    st.header("🥋 空手道 (Karatedō) - Mensalidades Registradas")
+    mensalidades = list(col_mensalidades.find().sort("vencimento", -1))
+    if mensalidades:
+        for m in mensalidades:
+            pago = "✅" if m.get("pago") else "❌"
+            st.markdown(f"📌 {m['aluno']} | Vencimento: {m['vencimento']} | Pago: {pago}")
+    else:
+        st.info("Nenhuma mensalidade registrada.")
 
-    hoje = datetime.today().date()
-
+    st.header("🥋 空手道 (Karatedō) - Registrar Mensalidade")
     with st.form("form_mensalidade"):
-        aluno = st.text_input("Aluno")
-        valor = st.number_input("Valor da Mensalidade", min_value=0.0, format="%.2f")
-        vencimento = st.date_input("Data de Vencimento", value=hoje)
+        alunos = list(col_alunos.find())
+        aluno_nomes = [a["nome"] for a in alunos]
+        aluno = st.selectbox("Aluno", aluno_nomes)
+       # calcula o próximo dia 5
+        hoje = datetime.today().date()
+        if hoje.day <= 5:
+            prox_venc = hoje.replace(day=5)
+        else:
+        # pula para o mês seguinte
+            ano = hoje.year + (1 if hoje.month == 12 else 0)
+            mes = 1 if hoje.month == 12 else hoje.month + 1
+            prox_venc = hoje.replace(year=ano, month=mes, day=5)
+        vencimento = st.date_input("Data de Vencimento", value=prox_venc)
+        pago = st.checkbox("Pago?")
+        if st.form_submit_button("Registrar"):
+            col_mensalidades.insert_one({
+                "aluno": aluno,
+                "vencimento": str(vencimento),
+                "pago": pago
+            })
+            st.success("Mensalidade registrada!")
+            st.rerun()
 
-        submitted = st.form_submit_button("Salvar Mensalidade")
+    if st.button("Exportar PDF de Mensalidades"):
+        pdf_bytes = exportar_pdf_mensalidades()
+        st.download_button("Baixar PDF", pdf_bytes, "mensalidades.pdf", "application/pdf")
+             
+   
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import Table, TableStyle
+    import io
+    from datetime import datetime
 
-        if submitted:
-            if not aluno.strip():
-                st.error("Por favor, informe o nome do aluno.")
-            else:
-                col_mensalidades.insert_one({
-                    "aluno": aluno.strip(),
-                    "valor": float(valor),
-                    "vencimento": vencimento,
-                    "data_registro": datetime.now()
-                })
-                st.success(f"Mensalidade salva para {aluno} no valor de R$ {valor:.2f}, vencendo em {vencimento}")
+    def gerar_pdf_grade(df, mes, ano):
+        buffer = io.BytesIO()
+        
+        # Cria PDF em paisagem
+        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+        
+        # Título
+        c.setFont("Helvetica-Bold", 16)
+        titulo = f"Grade de Presença - {datetime(ano, mes, 1).strftime('%B/%Y')}"
+        c.drawString(2 * cm, 19 * cm, titulo)
+        
+        # Prepara dados para tabela
+        data = [list(df.columns)] + df.astype(str).values.tolist()
+        
+        # Cria tabela do reportlab
+        table = Table(data, repeatRows=1, colWidths=[3*cm] + [1.2*cm]*(len(df.columns)-1))
+        
+        # Estilo da tabela
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
+        ])
+        table.setStyle(style)
+        
+        # Posiciona tabela
+        table.wrapOn(c, 20*cm, 15*cm)
+        table.drawOn(c, 2 * cm, 2 * cm)
+        
+        c.save()
+        pdf = buffer.getvalue()
+        buffer.close()
+        return pdf
 
-def listar_mensalidades():
-    st.header("🥋 空手道 (Karatedō) - Lista de Mensalidades")
+        # --- PDF Download ---
+        pdf_bytes = gerar_pdf_grade(grid_data, mes, ano)
 
-    mensalidades = list(col_mensalidades.find().sort("vencimento", 1))
-
-    if not mensalidades:
-        st.info("Nenhuma mensalidade cadastrada.")
-        return
-
-    # Montar DataFrame para exibir
-    df = pd.DataFrame(mensalidades)
-
-    # Opcional: remover _id para não aparecer na tabela
-    if "_id" in df.columns:
-        df.drop(columns=["_id"], inplace=True)
-
-    st.dataframe(df)
-
-def main():
-    st.sidebar.title("Menu")
-    pagina = st.sidebar.radio("Selecione a página", ["Cadastrar Mensalidade", "Listar Mensalidades"])
-
-    if pagina == "Cadastrar Mensalidade":
-        pagina_mensalidades()
-    elif pagina == "Listar Mensalidades":
-        listar_mensalidades()
+        st.download_button(
+            label="📄 Baixar Relatório em PDF",
+            data=pdf_bytes,
+            file_name=f"grade_presenca_{mes}_{ano}.pdf",
+            mime="application/pdf",
+    )   
 # -------------------------------------------------------
 # PÁGINA DE EXAMES
 # -------------------------------------------------------
