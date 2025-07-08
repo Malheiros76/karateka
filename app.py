@@ -602,46 +602,46 @@ def pagina_presencas():
                 data[dia] = ""
             df_grid = pd.DataFrame(data)
 
-# ---------------------------------------------------------
-# GARANTIR SEGURANÇA DOS DADOS PARA O AgGrid
-# ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # GARANTIR SEGURANÇA DOS DADOS PARA O AgGrid
+    # ---------------------------------------------------------
 
-# Garante que todas as colunas existam
-colunas_esperadas = ["Aluno"] + dias_no_mes
-for col in colunas_esperadas:
-    if col not in df_grid.columns:
-        df_grid[col] = ""
+    # Garante que todas as colunas existam
+    colunas_esperadas = ["Aluno"] + dias_no_mes
+    for col in colunas_esperadas:
+        if col not in df_grid.columns:
+            df_grid[col] = ""
 
-# Remove linhas totalmente vazias
-df_grid = df_grid.dropna(how="all")
+    # Remove linhas totalmente vazias
+    df_grid = df_grid.dropna(how="all")
 
-# Preenche NaNs
-df_grid = df_grid.fillna("")
+    # Preenche NaNs
+    df_grid = df_grid.fillna("")
 
-# Converte listas/dicionários/arrays em string
-for col in df_grid.columns:
-    if df_grid[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
-        df_grid[col] = df_grid[col].apply(str)
+    # Converte listas/dicionários/arrays em string
+    for col in df_grid.columns:
+        if df_grid[col].apply(lambda x: isinstance(x, (list, dict, np.ndarray))).any():
+            df_grid[col] = df_grid[col].apply(str)
 
-# Checa se há funções no DataFrame (causa MarshallComponentException)
-for col in df_grid.columns:
-    if df_grid[col].apply(lambda x: callable(x)).any():
-        st.error(f"ERRO: A coluna '{col}' contém função. Remova funções do DataFrame.")
-        st.stop()
+    # Checa se há funções no DataFrame (causa MarshallComponentException)
+    for col in df_grid.columns:
+        if df_grid[col].apply(lambda x: callable(x)).any():
+            st.error(f"ERRO: A coluna '{col}' contém função. Remova funções do DataFrame.")
+            st.stop()
 
-# Se DataFrame estiver completamente vazio (0 colunas), recria as colunas esperadas
-if df_grid.shape[1] == 0:
-    df_grid = pd.DataFrame(columns=colunas_esperadas)
+    # Se DataFrame estiver completamente vazio (0 colunas), recria as colunas esperadas
+    if df_grid.shape[1] == 0:
+        df_grid = pd.DataFrame(columns=colunas_esperadas)
 
-# Checa tipos
-st.write("Tipos das colunas:", df_grid.dtypes)
-st.write("Exemplo de dados:", df_grid.head())
+    # Checa tipos
+    st.write("Tipos das colunas:", df_grid.dtypes)
+    st.write("Exemplo de dados:", df_grid.head())
 
-st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
+    st.subheader(f"Registro de Presenças - {hoje.strftime('%B/%Y')}")
 
-if df_grid.empty:
+    if df_grid.empty:
         st.info("Nenhum dado para exibir na grade.")
-else:
+    else:
         # ---------------------------
         # Configura grid editável
         # ---------------------------
@@ -651,13 +651,13 @@ else:
 
         gb.configure_column("Aluno", editable=False, pinned="left", width=250)
 
-    for col in df_grid.columns:
+        for col in df_grid.columns:
             if col != "Aluno":
                 gb.configure_column(col, editable=True, width=80)
 
         grid_options = gb.build()
 
-    try:
+        try:
             grid_response = AgGrid(
                 df_grid,
                 gridOptions=grid_options,
@@ -666,13 +666,13 @@ else:
                 height=1000,
                 key="presencas_grid"
             )
-    except Exception as e:
+        except Exception as e:
             st.error(f"Erro ao renderizar AgGrid: {e}")
             st.stop()
 
         new_df = grid_response["data"]
 
-    if st.button("Salvar Presenças"):
+        if st.button("Salvar Presenças"):
             col_presencas.update_one(
                 {"ano": ano, "mes": mes},
                 {"$set": {
@@ -684,7 +684,7 @@ else:
             )
             st.success("Presenças salvas com sucesso!")
 
-    if st.button("Exportar PDF de Presenças"):
+        if st.button("Exportar PDF de Presenças"):
             pdf_bytes = exportar_pdf_presencas(new_df)
             st.download_button("Baixar PDF", pdf_bytes, "presencas.pdf", "application/pdf")
 
