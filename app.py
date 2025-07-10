@@ -445,12 +445,22 @@ MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreyns
 client = MongoClient(MONGO_URI)
 db = client["academia_karate"]
 
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+import io
+
 def gerar_pdf_relatorio_aluno(aluno_id):
     aluno = col_alunos.find_one({"_id": ObjectId(aluno_id)})
-
     if not aluno:
         st.error("Aluno não encontrado.")
         return None
+
+    # Buscar dados relacionados
+    mensalidades = list(col_mensalidades.find({"aluno_id": str(aluno_id)}))
+    presencas = list(col_presencas.find({"aluno_id": str(aluno_id)}))
+    exames = list(col_exames.find({"aluno_id": str(aluno_id)}))
+    emprestimos = list(col_emprestimos.find({"aluno_id": str(aluno_id)}))
+    equipamentos = list(col_equipamentos.find({"aluno_id": str(aluno_id)}))
 
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -465,7 +475,7 @@ def gerar_pdf_relatorio_aluno(aluno_id):
 
     y = 730
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y, f"Relatório do Aluno - {aluno['nome']}")
+    c.drawString(50, y, f"Relatório Completo - {aluno['nome']}")
     y -= 30
 
     c.setFont("Helvetica", 10)
@@ -478,11 +488,91 @@ def gerar_pdf_relatorio_aluno(aluno_id):
     c.drawString(50, y, f"Faixa: {aluno.get('faixa', '')}")
     y -= 15
     c.drawString(50, y, f"Data Nascimento: {aluno.get('data_nascimento', '')}")
+    y -= 25
+
+    def escreve_titulo(titulo):
+        nonlocal y
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, y, titulo)
+        y -= 20
+        c.setFont("Helvetica", 10)
+
+    def escreve_linhas(linhas):
+        nonlocal y
+        for linha in linhas:
+            c.drawString(60, y, linha)
+            y -= 15
+            if y < 50:
+                c.showPage()
+                y = 800
+
+    # MENSALIDADES
+    escreve_titulo("Mensalidades")
+    if mensalidades:
+        total_pago = sum(
+            float(m.get("valor", 0)) for m in mensalidades if m.get("pago") == True
+        )
+        escreve_linhas([f"Total pago: R$ {total_pago:.2f}"])
+
+        linhas = []
+        for m in mensalidades:
+            pago = "Sim" if m.get("pago") else "Não"
+            linhas.append(
+                f"Mês/Ano: {m.get('mes')}/{m.get('ano')} | Valor: R$ {m.get('valor')} | Pago: {pago}"
+            )
+        escreve_linhas(linhas)
+    else:
+        escreve_linhas(["Nenhum registro."])
+    y -= 10
+
+    # PRESENÇAS
+    escreve_titulo("Presenças")
+    if presencas:
+        linhas = [
+            f"Data: {p.get('data')} | Aula: {p.get('aula','')}" for p in presencas
+        ]
+        escreve_linhas(linhas)
+    else:
+        escreve_linhas(["Nenhum registro."])
+    y -= 10
+
+    # EXAMES
+    escreve_titulo("Exames")
+    if exames:
+        linhas = [
+            f"Data: {e.get('data')} | Faixa: {e.get('faixa','')}" for e in exames
+        ]
+        escreve_linhas(linhas)
+    else:
+        escreve_linhas(["Nenhum registro."])
+    y -= 10
+
+    # EMPRÉSTIMOS
+    escreve_titulo("Empréstimos")
+    if emprestimos:
+        linhas = [
+            f"Item: {em.get('item','')} | Data: {em.get('data','')}" for em in emprestimos
+        ]
+        escreve_linhas(linhas)
+    else:
+        escreve_linhas(["Nenhum registro."])
+    y -= 10
+
+    # EQUIPAMENTOS
+    escreve_titulo("Equipamentos")
+    if equipamentos:
+        linhas = [
+            f"Equipamento: {eq.get('nome','')} | Data compra: {eq.get('data_compra','')}"
+            for eq in equipamentos
+        ]
+        escreve_linhas(linhas)
+    else:
+        escreve_linhas(["Nenhum registro."])
 
     c.showPage()
     c.save()
-    buffer.seek(0)
 
+    buffer.seek(0)
     return buffer.read()
 
 from datetime import datetime, timedelta
@@ -519,7 +609,8 @@ def pagina_alunos():
                             data=pdf_bytes,
                             file_name=f"relatorio_{a['nome']}.pdf",
                             mime="application/pdf"
-            )
+                        )
+
         else:
             st.info("Nenhum aluno cadastrado.")
 
