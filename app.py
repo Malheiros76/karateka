@@ -441,6 +441,10 @@ from reportlab.lib.pagesizes import A4
 import io
 import base64
 
+MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreynsd.mongodb.net/"
+client = MongoClient(MONGO_URI)
+db = client["academia_karate"]
+
 def gerar_pdf_relatorio_aluno(aluno_id):
     aluno = col_alunos.find_one({"_id": ObjectId(aluno_id)})
 
