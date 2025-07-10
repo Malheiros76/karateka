@@ -444,6 +444,15 @@ import base64
 MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreynsd.mongodb.net/"
 client = MongoClient(MONGO_URI)
 db = client["academia_karate"]
+col_usuarios = db["usuarios"]
+col_academia = db["academia"]
+col_alunos = db["alunos"]
+col_presencas = db["presencas"]
+col_mensalidades = db["mensalidades"]
+col_exames = db["exames"]
+col_equipamentos = db["equipamentos"]
+col_emprestimos = db["emprestimos"]
+col_dojo = db["dojo"]
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
