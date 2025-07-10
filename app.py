@@ -458,51 +458,74 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 import io
 
+import io
+import base64
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+from bson import ObjectId
+
 def gerar_pdf_relatorio_aluno(aluno_id):
+    # busca o aluno
     aluno = col_alunos.find_one({"_id": ObjectId(aluno_id)})
     if not aluno:
         st.error("Aluno não encontrado.")
-        return None
+        return
 
-    # Buscar dados relacionados
-    mensalidades = list(col_mensalidades.find({"aluno_id": str(aluno_id)}))
-    presencas = list(col_presencas.find({"aluno_id": str(aluno_id)}))
-    exames = list(col_exames.find({"aluno_id": str(aluno_id)}))
-    emprestimos = list(col_emprestimos.find({"aluno_id": str(aluno_id)}))
-    equipamentos = list(col_equipamentos.find({"aluno_id": str(aluno_id)}))
+    nome_aluno = aluno["nome"].strip().upper()
 
+    # Busca dados nas coleções
+    mensalidades = list(col_mensalidades.find({"aluno": nome_aluno}))
+    exames = list(col_exames.find({"aluno": nome_aluno}))
+    emprestimos = list(col_emprestimos.find({"aluno": nome_aluno}))
+    equipamentos = list(col_equipamentos.find({"aluno": nome_aluno}))
+
+    # Para presenças: tem 2 jeitos nos seus dados!
+    presencas_simples = list(col_presencas.find({"presentes": nome_aluno}))
+    # E também pode estar na tabela mensal
+    presencas_tabela_doc = col_presencas.find_one({"tabela.Aluno": nome_aluno})
+    presencas_tabela = []
+    if presencas_tabela_doc:
+        for linha in presencas_tabela_doc["tabela"]:
+            if linha.get("Aluno", "").strip().upper() == nome_aluno:
+                for dia, val in linha.items():
+                    if dia != "Aluno" and val not in ("", None):
+                        presencas_tabela.append(f"{dia}: {val}")
+
+    # Cria PDF
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
 
-    # Cabeçalho
+    # CABEÇALHO (imagem)
     cabecalho_path = "cabecario.jpg"
     try:
         c.drawImage(cabecalho_path, 50, 750, width=500, height=80, preserveAspectRatio=True)
     except:
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, 800, "Cabeçalho não encontrado.")
+        c.drawString(50, 800, "Relatório - SEITO KARATE FAMILY TEAM")
 
-    y = 730
+    y = 740
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y, f"Relatório Completo - {aluno['nome']}")
+    c.drawString(50, y, f"Relatório Completo do Aluno - {aluno['nome']}")
     y -= 30
 
+    # Dados pessoais
     c.setFont("Helvetica", 10)
-    c.drawString(50, y, f"Nome: {aluno['nome']}")
+    c.drawString(50, y, f"Nome: {aluno.get('nome')}")
     y -= 15
-    c.drawString(50, y, f"RG: {aluno.get('rg', '')}")
+    c.drawString(50, y, f"RG: {aluno.get('rg','')}")
     y -= 15
-    c.drawString(50, y, f"Telefone: {aluno.get('telefone', '')}")
+    c.drawString(50, y, f"Telefone: {aluno.get('telefone','')}")
     y -= 15
-    c.drawString(50, y, f"Faixa: {aluno.get('faixa', '')}")
+    c.drawString(50, y, f"Faixa: {aluno.get('faixa','')}")
     y -= 15
-    c.drawString(50, y, f"Data Nascimento: {aluno.get('data_nascimento', '')}")
+    c.drawString(50, y, f"Data de Nascimento: {aluno.get('data_nascimento','')}")
     y -= 25
 
     def escreve_titulo(titulo):
         nonlocal y
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, y, titulo)
+        c.drawString(50, y, titulo + ":")
         y -= 20
         c.setFont("Helvetica", 10)
 
@@ -517,72 +540,88 @@ def gerar_pdf_relatorio_aluno(aluno_id):
 
     # MENSALIDADES
     escreve_titulo("Mensalidades")
+    total_pago = 0
+    linhas_mensalidades = []
     if mensalidades:
-        total_pago = sum(
-            float(m.get("valor", 0)) for m in mensalidades if m.get("pago") == True
-        )
-        escreve_linhas([f"Total pago: R$ {total_pago:.2f}"])
-
-        linhas = []
         for m in mensalidades:
             pago = "Sim" if m.get("pago") else "Não"
-            linhas.append(
-                f"Mês/Ano: {m.get('mes')}/{m.get('ano')} | Valor: R$ {m.get('valor')} | Pago: {pago}"
-            )
-        escreve_linhas(linhas)
+            venc = m.get("vencimento", "")
+            valor = str(m.get("valor", "Não informado"))
+            linhas_mensalidades.append(f"Vencimento: {venc} | Valor: {valor} | Pago: {pago}")
+            if m.get("pago") and m.get("valor"):
+                try:
+                    total_pago += float(str(m["valor"]).replace(",", "."))
+                except:
+                    pass
+        linhas_mensalidades.append(f"Total pago: R$ {total_pago:.2f}")
     else:
-        escreve_linhas(["Nenhum registro."])
+        linhas_mensalidades.append("Nenhum registro.")
+    escreve_linhas(linhas_mensalidades)
     y -= 10
 
-    # PRESENÇAS
+    # PRESENCAS
     escreve_titulo("Presenças")
-    if presencas:
-        linhas = [
-            f"Data: {p.get('data')} | Aula: {p.get('aula','')}" for p in presencas
-        ]
-        escreve_linhas(linhas)
-    else:
-        escreve_linhas(["Nenhum registro."])
+    linhas_presencas = []
+    if presencas_simples:
+        for p in presencas_simples:
+            linhas_presencas.append(f"Data: {p.get('data','')}")
+    if presencas_tabela:
+        linhas_presencas.append("Resumo tabela mensal:")
+        linhas_presencas += presencas_tabela
+    if not linhas_presencas:
+        linhas_presencas.append("Nenhum registro.")
+    escreve_linhas(linhas_presencas)
     y -= 10
 
     # EXAMES
     escreve_titulo("Exames")
+    linhas_exames = []
     if exames:
-        linhas = [
-            f"Data: {e.get('data')} | Faixa: {e.get('faixa','')}" for e in exames
-        ]
-        escreve_linhas(linhas)
+        for e in exames:
+            linhas_exames.append(
+                f"Data: {e.get('data','')} | Faixa: {e.get('faixa','')} | Status: {e.get('status','')}"
+            )
     else:
-        escreve_linhas(["Nenhum registro."])
+        linhas_exames.append("Nenhum registro.")
+    escreve_linhas(linhas_exames)
     y -= 10
 
-    # EMPRÉSTIMOS
+    # EMPRESTIMOS
     escreve_titulo("Empréstimos")
+    linhas_emprestimos = []
     if emprestimos:
-        linhas = [
-            f"Item: {em.get('item','')} | Data: {em.get('data','')}" for em in emprestimos
-        ]
-        escreve_linhas(linhas)
+        for em in emprestimos:
+            linhas_emprestimos.append(
+                f"Equipamento: {em.get('equipamento','')} | "
+                f"Empréstimo: {em.get('data_emprestimo','')} | "
+                f"Devolução: {em.get('data_devolucao','')} | "
+                f"Devolvido: {'Sim' if em.get('devolvido') else 'Não'}"
+            )
     else:
-        escreve_linhas(["Nenhum registro."])
+        linhas_emprestimos.append("Nenhum registro.")
+    escreve_linhas(linhas_emprestimos)
     y -= 10
 
     # EQUIPAMENTOS
     escreve_titulo("Equipamentos")
+    linhas_eq = []
     if equipamentos:
-        linhas = [
-            f"Equipamento: {eq.get('nome','')} | Data compra: {eq.get('data_compra','')}"
-            for eq in equipamentos
-        ]
-        escreve_linhas(linhas)
+        for eq in equipamentos:
+            linhas_eq.append(
+                f"Nome: {eq.get('nome','')} | Data compra: {eq.get('data_compra','')}"
+            )
     else:
-        escreve_linhas(["Nenhum registro."])
+        linhas_eq.append("Nenhum registro.")
+    escreve_linhas(linhas_eq)
 
     c.showPage()
     c.save()
-
     buffer.seek(0)
-    return buffer.read()
+
+    # Disponibiliza download
+    b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
+    href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="relatorio_{aluno["nome"]}.pdf">📄 Download Relatório PDF</a>'
+    st.markdown(href, unsafe_allow_html=True)
 
 from datetime import datetime, timedelta
 import streamlit as st
@@ -611,14 +650,8 @@ def pagina_alunos():
                     st.rerun()
             with col4:
                 if st.button(f"📄 Relatório PDF {a['nome']}", key=f"relatorio_{a['_id']}"):
-                    pdf_bytes = gerar_pdf_relatorio_aluno(a["_id"])
-                    if pdf_bytes:
-                        st.download_button(
-                            label=f"⬇️ Baixar Relatório {a['nome']}.pdf",
-                            data=pdf_bytes,
-                            file_name=f"relatorio_{a['nome']}.pdf",
-                            mime="application/pdf"
-                        )
+                    gerar_pdf_relatorio_aluno(str(a["_id"]))
+
 
         else:
             st.info("Nenhum aluno cadastrado.")
