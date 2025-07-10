@@ -465,29 +465,35 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from bson import ObjectId
 
+import re
+
 def gerar_pdf_relatorio_aluno(aluno_id):
-    # busca o aluno
     aluno = col_alunos.find_one({"_id": ObjectId(aluno_id)})
+
     if not aluno:
         st.error("Aluno não encontrado.")
         return
 
-    nome_aluno = aluno["nome"].strip().upper()
+    # Corrige espaços duplicados
+    nome_aluno = re.sub(r"\s+", " ", aluno["nome"]).strip().upper()
 
-    # Busca dados nas coleções
-    mensalidades = list(col_mensalidades.find({"aluno": nome_aluno}))
-    exames = list(col_exames.find({"aluno": nome_aluno}))
-    emprestimos = list(col_emprestimos.find({"aluno": nome_aluno}))
-    equipamentos = list(col_equipamentos.find({"aluno": nome_aluno}))
+    # Regex para buscar nos campos
+    regex_nome = re.compile(rf"{re.escape(nome_aluno)}", re.IGNORECASE)
 
-    # Para presenças: tem 2 jeitos nos seus dados!
-    presencas_simples = list(col_presencas.find({"presentes": nome_aluno}))
-    # E também pode estar na tabela mensal
-    presencas_tabela_doc = col_presencas.find_one({"tabela.Aluno": nome_aluno})
+    # Busca dados
+    mensalidades = list(col_mensalidades.find({"aluno": regex_nome}))
+    exames = list(col_exames.find({"aluno": regex_nome}))
+    emprestimos = list(col_emprestimos.find({"aluno": regex_nome}))
+    equipamentos = list(col_equipamentos.find({"aluno": regex_nome}))
+
+    # Presenças (duas formas)
+    presencas_simples = list(col_presencas.find({"presentes": regex_nome}))
+    presencas_tabela_doc = col_presencas.find_one({"tabela.Aluno": regex_nome})
     presencas_tabela = []
     if presencas_tabela_doc:
         for linha in presencas_tabela_doc["tabela"]:
-            if linha.get("Aluno", "").strip().upper() == nome_aluno:
+            aluno_tab_nome = re.sub(r"\s+", " ", linha.get("Aluno", "")).strip().upper()
+            if aluno_tab_nome == nome_aluno:
                 for dia, val in linha.items():
                     if dia != "Aluno" and val not in ("", None):
                         presencas_tabela.append(f"{dia}: {val}")
