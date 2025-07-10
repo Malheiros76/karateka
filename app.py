@@ -436,10 +436,14 @@ def pagina_geral():
 # -------------------------------------------------------
 # PÁGINA DE ALUNOS
 # -------------------------------------------------------
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+
+import re
 import io
 import base64
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+from bson import ObjectId
 
 MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreynsd.mongodb.net/"
 client = MongoClient(MONGO_URI)
@@ -454,18 +458,9 @@ col_equipamentos = db["equipamentos"]
 col_emprestimos = db["emprestimos"]
 col_dojo = db["dojo"]
 
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-import io
-
-import io
-import base64
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.utils import ImageReader
-from bson import ObjectId
-
-import re
+# Função para normalizar nome (tira espaços duplicados e põe tudo maiúsculo)
+def normalizar_nome(nome):
+    return re.sub(r"\s+", " ", nome).strip().upper()
 
 def gerar_pdf_relatorio_aluno(aluno_id):
     aluno = col_alunos.find_one({"_id": ObjectId(aluno_id)})
@@ -474,64 +469,46 @@ def gerar_pdf_relatorio_aluno(aluno_id):
         st.error("Aluno não encontrado.")
         return
 
-    # Corrige espaços duplicados
-    nome_aluno = re.sub(r"\s+", " ", aluno["nome"]).strip().upper()
+    # Normaliza o nome para buscas
+    nome_normalizado = normalizar_nome(aluno["nome"])
+    regex_nome = re.compile(f"^{re.escape(nome_normalizado)}$", re.IGNORECASE)
 
-    # Regex para buscar nos campos
-    regex_nome = re.compile(rf"{re.escape(nome_aluno)}", re.IGNORECASE)
-
-    # Busca dados
+    # Busca dados em todas as coleções
     mensalidades = list(col_mensalidades.find({"aluno": regex_nome}))
+    presencas = list(col_presencas.find({"aluno": regex_nome}))
     exames = list(col_exames.find({"aluno": regex_nome}))
     emprestimos = list(col_emprestimos.find({"aluno": regex_nome}))
     equipamentos = list(col_equipamentos.find({"aluno": regex_nome}))
-
-    # Presenças (duas formas)
-    presencas_simples = list(col_presencas.find({"presentes": regex_nome}))
-    presencas_tabela_doc = col_presencas.find_one({"tabela.Aluno": regex_nome})
-    presencas_tabela = []
-    if presencas_tabela_doc:
-        for linha in presencas_tabela_doc["tabela"]:
-            aluno_tab_nome = re.sub(r"\s+", " ", linha.get("Aluno", "")).strip().upper()
-            if aluno_tab_nome == nome_aluno:
-                for dia, val in linha.items():
-                    if dia != "Aluno" and val not in ("", None):
-                        presencas_tabela.append(f"{dia}: {val}")
 
     # Cria PDF
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
 
-    # CABEÇALHO (imagem)
+    # Cabeçalho
     cabecalho_path = "cabecario.jpg"
-    try:
-        c.drawImage(cabecalho_path, 50, 750, width=500, height=80, preserveAspectRatio=True)
-    except:
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, 800, "Relatório - SEITO KARATE FAMILY TEAM")
+    c.drawImage(cabecalho_path, 50, 750, width=500, height=80, preserveAspectRatio=True)
 
     y = 740
     c.setFont("Helvetica-Bold", 14)
     c.drawString(50, y, f"Relatório Completo do Aluno - {aluno['nome']}")
     y -= 30
 
-    # Dados pessoais
     c.setFont("Helvetica", 10)
-    c.drawString(50, y, f"Nome: {aluno.get('nome')}")
+    c.drawString(50, y, f"Nome: {aluno['nome']}")
     y -= 15
-    c.drawString(50, y, f"RG: {aluno.get('rg','')}")
+    c.drawString(50, y, f"RG: {aluno.get('rg', '')}")
     y -= 15
-    c.drawString(50, y, f"Telefone: {aluno.get('telefone','')}")
+    c.drawString(50, y, f"Telefone: {aluno.get('telefone', '')}")
     y -= 15
-    c.drawString(50, y, f"Faixa: {aluno.get('faixa','')}")
+    c.drawString(50, y, f"Faixa: {aluno.get('faixa', '')}")
     y -= 15
-    c.drawString(50, y, f"Data de Nascimento: {aluno.get('data_nascimento','')}")
+    c.drawString(50, y, f"Data de Nascimento: {aluno.get('data_nascimento', '')}")
     y -= 25
 
     def escreve_titulo(titulo):
         nonlocal y
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, y, titulo + ":")
+        c.drawString(50, y, f"{titulo}:")
         y -= 20
         c.setFont("Helvetica", 10)
 
@@ -544,90 +521,77 @@ def gerar_pdf_relatorio_aluno(aluno_id):
                 c.showPage()
                 y = 800
 
-    # MENSALIDADES
+    # Mensalidades
     escreve_titulo("Mensalidades")
-    total_pago = 0
-    linhas_mensalidades = []
     if mensalidades:
-        for m in mensalidades:
-            pago = "Sim" if m.get("pago") else "Não"
-            venc = m.get("vencimento", "")
-            valor = str(m.get("valor", "Não informado"))
-            linhas_mensalidades.append(f"Vencimento: {venc} | Valor: {valor} | Pago: {pago}")
-            if m.get("pago") and m.get("valor"):
-                try:
-                    total_pago += float(str(m["valor"]).replace(",", "."))
-                except:
-                    pass
-        linhas_mensalidades.append(f"Total pago: R$ {total_pago:.2f}")
+        total_pago = sum(1 for m in mensalidades if m.get("pago", False))
+        linhas = [
+            f"Vencimento: {m.get('vencimento','')} - Pago: {m.get('pago', False)}"
+            for m in mensalidades
+        ]
+        escreve_linhas(linhas)
+        escreve_linhas([f"Total Mensalidades Pagas: {total_pago}"])
     else:
-        linhas_mensalidades.append("Nenhum registro.")
-    escreve_linhas(linhas_mensalidades)
+        escreve_linhas(["Nenhum registro."])
     y -= 10
 
-    # PRESENCAS
+    # Presenças
     escreve_titulo("Presenças")
-    linhas_presencas = []
-    if presencas_simples:
-        for p in presencas_simples:
-            linhas_presencas.append(f"Data: {p.get('data','')}")
-    if presencas_tabela:
-        linhas_presencas.append("Resumo tabela mensal:")
-        linhas_presencas += presencas_tabela
-    if not linhas_presencas:
-        linhas_presencas.append("Nenhum registro.")
-    escreve_linhas(linhas_presencas)
+    if presencas:
+        linhas = [
+            f"Data: {p.get('data','')}"
+            for p in presencas
+        ]
+        escreve_linhas(linhas)
+    else:
+        escreve_linhas(["Nenhum registro."])
     y -= 10
 
-    # EXAMES
+    # Exames
     escreve_titulo("Exames")
-    linhas_exames = []
     if exames:
-        for e in exames:
-            linhas_exames.append(
-                f"Data: {e.get('data','')} | Faixa: {e.get('faixa','')} | Status: {e.get('status','')}"
-            )
+        linhas = [
+            f"Data: {e.get('data')} - Faixa: {e.get('faixa')} - Status: {e.get('status')}"
+            for e in exames
+        ]
+        escreve_linhas(linhas)
     else:
-        linhas_exames.append("Nenhum registro.")
-    escreve_linhas(linhas_exames)
+        escreve_linhas(["Nenhum registro."])
     y -= 10
 
-    # EMPRESTIMOS
+    # Empréstimos
     escreve_titulo("Empréstimos")
-    linhas_emprestimos = []
     if emprestimos:
-        for em in emprestimos:
-            linhas_emprestimos.append(
-                f"Equipamento: {em.get('equipamento','')} | "
-                f"Empréstimo: {em.get('data_emprestimo','')} | "
-                f"Devolução: {em.get('data_devolucao','')} | "
-                f"Devolvido: {'Sim' if em.get('devolvido') else 'Não'}"
-            )
+        linhas = [
+            f"Item: {em.get('equipamento','')} - Empréstimo: {em.get('data_emprestimo','')} - Devolução: {em.get('data_devolucao','')} - Observações: {em.get('observacoes','')}"
+            for em in emprestimos
+        ]
+        escreve_linhas(linhas)
     else:
-        linhas_emprestimos.append("Nenhum registro.")
-    escreve_linhas(linhas_emprestimos)
+        escreve_linhas(["Nenhum registro."])
     y -= 10
 
-    # EQUIPAMENTOS
+    # Equipamentos
     escreve_titulo("Equipamentos")
-    linhas_eq = []
     if equipamentos:
-        for eq in equipamentos:
-            linhas_eq.append(
-                f"Nome: {eq.get('nome','')} | Data compra: {eq.get('data_compra','')}"
-            )
+        linhas = [
+            f"Equipamento: {eq.get('nome','')} - Data de Compra: {eq.get('data_compra','')}"
+            for eq in equipamentos
+        ]
+        escreve_linhas(linhas)
     else:
-        linhas_eq.append("Nenhum registro.")
-    escreve_linhas(linhas_eq)
+        escreve_linhas(["Nenhum registro."])
 
     c.showPage()
     c.save()
+
     buffer.seek(0)
 
-    # Disponibiliza download
+    # Baixar PDF via link no Streamlit
     b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
     href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="relatorio_{aluno["nome"]}.pdf">📄 Download Relatório PDF</a>'
     st.markdown(href, unsafe_allow_html=True)
+
 
 from datetime import datetime, timedelta
 import streamlit as st
