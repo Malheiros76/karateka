@@ -1078,11 +1078,12 @@ def pagina_mensalidades():
             })
             st.success("Mensalidade registrada!")
             st.rerun()
-
+import streamlit as st
 import pandas as pd
 from pymongo import MongoClient
 from bson import ObjectId
 import io
+import base64
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
@@ -1182,6 +1183,10 @@ def exportar_pdf_exames(alunos):
 def pagina_exames():
     st.header("🥋 空手道 (Karatedō) - Gerenciar Exames")
 
+    # -------------------------------------------------------
+    # FORMULÁRIO PARA NOVO EXAME
+    # -------------------------------------------------------
+
     alunos = list(col_alunos.find())
     st.subheader("📝 Registrar Novo Exame")
 
@@ -1226,37 +1231,10 @@ def pagina_exames():
         with st.form("form_edit_exame"):
             aluno = st.text_input("Aluno", exame["aluno"], disabled=True)
             data = st.date_input("Data do Exame", pd.to_datetime(exame["data"]))
-
-            belt_progression = {
-                "Branca": "Amarela",
-                "Amarela": "Laranja",
-                "Laranja": "Verde",
-                "Verde": "Azul",
-                "Azul": "Roxa",
-                "Roxa": "Marrom",
-                "Marrom": "Preta",
-                "Preta": None
-            }
-
-            faixas = list(belt_progression.keys())
-            faixa_atual = exame["faixa"]
-            if faixa_atual in faixas:
-                index_faixa = faixas.index(faixa_atual)
-            else:
-                st.warning(f"⚠️ Faixa **{faixa_atual}** não encontrada. Será selecionada a primeira faixa.")
-                index_faixa = 0
-
-            faixa = st.selectbox(
-                "Faixa",
-                faixas,
-                index=index_faixa
-            )
-
-            status = st.selectbox(
-                "Status",
-                ["Aprovado", "Reprovado"],
-                index=0 if exame["status"] == "Aprovado" else 1
-            )
+            faixa = st.selectbox("Faixa", list(belt_progression.keys()),
+                                 index=list(belt_progression.keys()).index(exame["faixa"]))
+            status = st.selectbox("Status", ["Aprovado", "Reprovado"],
+                                  index=0 if exame["status"] == "Aprovado" else 1)
 
             col1, col2 = st.columns(2)
             with col1:
@@ -1297,9 +1275,29 @@ def pagina_exames():
         )
 
     st.divider()
-
     # -------------------------------------------------------
-    # LISTAR EXAMES AGRUPADOS POR ALUNO
+    # EXIBIR RELATÓRIO INDIVIDUAL NA TELA
+    # -------------------------------------------------------
+
+#    if st.session_state.get("show_relatorio", False):
+#       nome_aluno = st.session_state["relatorio_aluno_nome"]
+#      exames = st.session_state["relatorio_exames"]
+#
+#       st.header(f"📄 Relatório Individual - {nome_aluno}")
+#
+#       if exames:
+#          df = pd.DataFrame(exames)
+#            df = df[["data", "faixa", "status"]]
+#            df.columns = ["Data", "Faixa", "Status"]
+#            st.table(df)
+#        else:
+#            st.info("Este aluno não possui exames registrados.")
+#
+#        if st.button("⬅️ Voltar"):
+#            st.session_state["show_relatorio"] = False
+#            st.rerun()
+    # -------------------------------------------------------
+    # HISTÓRICO DE EXAMES POR ALUNO
     # -------------------------------------------------------
 
     st.subheader("📚 Histórico de Exames por Aluno")
@@ -1329,9 +1327,78 @@ def pagina_exames():
                         st.session_state["edit_exame_id"] = exame_id
                         st.session_state["edit_mode"] = True
                         st.rerun()
+
+            col3, col4 = st.columns(2)
+
+            #with col3:
+            #    if st.button(f"🔎 Ver relatório individual de {aluno_doc['nome']}", key=f"relatorio_{aluno_doc['_id']}"):
+            #        st.session_state["relatorio_aluno_nome"] = aluno_doc["nome"]
+            #        st.session_state["relatorio_exames"] = exames
+            #        st.session_state["show_relatorio"] = True
+            #        st.rerun()
+
+            with col4:
+                if st.button(f"📄 Gerar PDF de {aluno_doc['nome']}", key=f"pdf_{aluno_doc['_id']}"):
+                    buffer = io.BytesIO()
+                    c = canvas.Canvas(buffer, pagesize=A4)
+                    width, height = A4
+
+                imagem_cabecalho = "cabecario.jpg"
+
+                try:
+                    img = ImageReader(imagem_cabecalho)
+                    img_width_px = 1208
+                    img_height_px = 311
+
+                    scale_factor = width / img_width_px
+                    img_width_pts = width
+                    img_height_pts = img_height_px * scale_factor
+
+                    c.drawImage(
+                        img,
+                        x=0,
+                        y=height - img_height_pts,
+                        width=img_width_pts,
+                        height=img_height_pts,
+                        mask='auto'
+                    )
+                    y = height - img_height_pts - 30
+
+                except Exception as e:
+                    st.error(f"Erro ao carregar cabeçalho: {e}")
+                    y = height - 50
+
+                c.setFont("Helvetica-Bold", 16)
+                c.drawString(50, y, f"Relatório de Exames - {aluno_doc['nome']}")
+                y -= 30
+
+                c.setFont("Helvetica", 12)
+
+                for exame in exames:
+                    data_str = exame["data"]
+                    texto = f"Data: {data_str} | Faixa: {exame['faixa']} | Status: {exame['status']}"
+                    c.drawString(50, y, texto)
+                    y -= 20
+                    if y < 50:
+                        c.showPage()
+                        y = height - 50
+
+                    c.showPage()
+                    c.save()
+                    buffer.seek(0)
+
+                    b64 = base64.b64encode(buffer.read()).decode()
+                    href = f'<a href="data:application/pdf;base64,{b64}" download="relatorio_{aluno_doc["nome"]}.pdf">📥 Download do PDF</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+
+
         else:
             st.info(f"Aluno **{aluno_doc['nome']}** ainda não possui exames registrados.")
 
+    
+#-----------------------------------------------------------------------
+#PAGINA EMPRESTIMOS
+#-----------------------------------------------------------------------
 def pagina_emprestimos():
     st.title("🥋 空手道 (Karatedō) - 📦 Gerenciamento de Empréstimos")
 
@@ -1433,7 +1500,7 @@ def pagina_emprestimos():
         st.info("Nenhum empréstimo ativo no momento.")
     else:
         for emp in emprestimos_ativos:
-            col1, col2, col3 = st.columns([6,3,2])
+            col1, col2, col3 = st.columns([6,1,1])
             with col1:
                 st.markdown(
                     f"**Aluno:** {emp.get('aluno', 'Sem nome')}  \n"
@@ -1498,7 +1565,7 @@ def pagina_equipamentos():
             codigo = eq.get('codigo', 'Código não informado')
             estado = eq.get('estado', 'Estado não informado')
 
-            col1, col2 = st.columns([7,3])
+            col1, col2 = st.columns([7,1])
             with col1:
                 st.markdown(
                     f"**Tipo:** {tipo}  \n"
