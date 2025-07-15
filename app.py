@@ -202,36 +202,57 @@ def exportar_pdf_alunos():
 # FUNÇÃO PARA EXPORTAR PDF DE PRESENÇAS
 # -------------------------------------------------------
 
-def exportar_pdf_presencas():
+def exportar_pdf_presencas(df):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
 
-    # -----------------------------------
-    # Buscar dados do dojo
-    # -----------------------------------
-    dojo = col_dojo.find_one({
-        "_id": ObjectId("686bbeld488b17fb0be63470")
-    })
+    width, height = A4
 
-    if dojo and dojo.get("logo_data"):
-        image_data = dojo["logo_data"]
+    # CABEÇALHO (opcional)
+    try:
+        img = ImageReader("cabecario.jpg")
+        img_width_px = 1208
+        img_height_px = 311
+        scale_factor = width / img_width_px
+        img_width_pts = width
+        img_height_pts = img_height_px * scale_factor
 
-        # Abrir imagem do logo
-        image = Image.open(io.BytesIO(image_data))
+        c.drawImage(
+            img,
+            x=0,
+            y=height - img_height_pts,
+            width=img_width_pts,
+            height=img_height_pts,
+            mask='auto'
+        )
+        y_pos = height - img_height_pts - 30
+    except Exception as e:
+        st.warning(f"Erro ao carregar cabeçalho: {e}")
+        y_pos = height - 50
 
-        # Converter para ImageReader
-        img_reader = ImageReader(image)
+    # TÍTULO
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, y_pos, "Relatório de Presenças")
+    y_pos -= 30
 
-        # Desenhar imagem
-        c.drawImage(img_reader, 2*cm, 26*cm, width=4*cm, height=4*cm)
+    c.setFont("Helvetica", 10)
 
-        # Nome do dojo ao lado do brasão
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(7*cm, 28*cm, dojo.get("nome", "Dojo"))
-    else:
-        # Caso não encontre logo
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(2*cm, 28*cm, "Relatório de Presenças")
+    # Dados da tabela
+    for index, row in df.iterrows():
+        linha = f"{row['Aluno']}: " + " | ".join(
+            f"{col}: {row[col]}" for col in df.columns if col != "Aluno"
+        )
+        c.drawString(50, y_pos, linha)
+        y_pos -= 15
+        if y_pos < 50:
+            c.showPage()
+            y_pos = height - 50
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
 
     # -----------------------------------
     # Buscar presenças do dia
