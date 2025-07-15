@@ -235,7 +235,7 @@ def exportar_pdf_presencas(df):
         st.warning(f"Erro ao carregar cabeçalho: {e}")
         y_pos = height - 50
 
-    c.setFont("Helvetica-Bold", 16)
+    c.setFont("Helvetica-Bold",10)
     c.drawString(50, y_pos, "Relatório de Presenças")
     y_pos -= 30
 
@@ -258,7 +258,7 @@ def exportar_pdf_presencas(df):
 
 
     # TÍTULO
-    c.setFont("Helvetica-Bold", 08)
+    c.setFont("Helvetica-Bold", 10)
     c.drawString(50, y_pos, "Relatório de Presenças")
     y_pos -= 30
 
