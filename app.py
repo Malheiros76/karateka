@@ -1440,7 +1440,7 @@ def pagina_emprestimos():
         st.info("Nenhum empréstimo ativo no momento.")
     else:
         for emp in emprestimos_ativos:
-            col1, col2, col3 = st.columns([6,3,1])
+            col1, col2, col3 = st.columns([6,3,2])
             with col1:
                 st.markdown(
                     f"**Aluno:** {emp.get('aluno', 'Sem nome')}  \n"
