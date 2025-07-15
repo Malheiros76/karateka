@@ -897,7 +897,7 @@ def gerar_pdf_relatorio_aluno(aluno_id):
         nonlocal y
         for linha in linhas:
             c.drawString(60, y, linha)
-            y -= 15
+            y -= 7
 
     # Mensalidades
     escreve_titulo("Mensalidades")
@@ -1599,7 +1599,7 @@ def pagina_emprestimos():
         st.info("Nenhum empréstimo ativo no momento.")
     else:
         for emp in emprestimos_ativos:
-            col1, col2, col3 = st.columns([6,1,1])
+            col1, col2, col3 = st.columns([6,3,3])
             with col1:
                 st.markdown(
                     f"**Aluno:** {emp.get('aluno', 'Sem nome')}  \n"
@@ -1664,7 +1664,7 @@ def pagina_equipamentos():
             codigo = eq.get('codigo', 'Código não informado')
             estado = eq.get('estado', 'Estado não informado')
 
-            col1, col2 = st.columns([7,1])
+            col1, col2 = st.columns([7,3])
             with col1:
                 st.markdown(
                     f"**Tipo:** {tipo}  \n"
