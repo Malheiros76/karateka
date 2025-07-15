@@ -203,12 +203,17 @@ def exportar_pdf_alunos():
 # -------------------------------------------------------
 
 def exportar_pdf_presencas(df):
+   from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.utils import ImageReader
+import io
+
+def exportar_pdf_presencas(df):
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
 
-    width, height = A4
+    width, height = landscape(A4)
 
-    # CABEÇALHO (opcional)
     try:
         img = ImageReader("cabecario.jpg")
         img_width_px = 1208
@@ -230,12 +235,34 @@ def exportar_pdf_presencas(df):
         st.warning(f"Erro ao carregar cabeçalho: {e}")
         y_pos = height - 50
 
-    # TÍTULO
-    c.setFont("Helvetica-Bold", 11)
+    c.setFont("Helvetica-Bold", 16)
     c.drawString(50, y_pos, "Relatório de Presenças")
     y_pos -= 30
 
     c.setFont("Helvetica", 10)
+
+    for index, row in df.iterrows():
+        linha = f"{row['Aluno']}: " + " | ".join(
+            f"{col}: {row[col]}" for col in df.columns if col != "Aluno"
+        )
+        c.drawString(50, y_pos, linha)
+        y_pos -= 15
+        if y_pos < 50:
+            c.showPage()
+            y_pos = height - 50
+
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+    # TÍTULO
+    c.setFont("Helvetica-Bold", 08)
+    c.drawString(50, y_pos, "Relatório de Presenças")
+    y_pos -= 30
+
+    c.setFont("Helvetica", 07)
 
     # Dados da tabela
     for index, row in df.iterrows():
