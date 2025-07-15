@@ -231,7 +231,7 @@ def exportar_pdf_presencas(df):
         y_pos = height - 50
 
     # TÍTULO
-    c.setFont("Helvetica-Bold", 16)
+    c.setFont("Helvetica-Bold", 11)
     c.drawString(50, y_pos, "Relatório de Presenças")
     y_pos -= 30
 
