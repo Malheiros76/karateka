@@ -760,6 +760,19 @@ def pagina_presencas():
 
     if registro and registro.get("tabela"):
         df_grid = pd.DataFrame(registro["tabela"])
+    
+        # Garante que novos alunos sejam adicionados
+        alunos_existentes = df_grid["Aluno"].tolist()
+        alunos_novos = [a for a in nomes_alunos if a not in alunos_existentes]
+    
+        for nome in alunos_novos:
+            nova_linha = {col: "" for col in df_grid.columns}
+            nova_linha["Aluno"] = nome
+            df_grid = pd.concat([df_grid, pd.DataFrame([nova_linha])], ignore_index=True)
+    
+        # Remove alunos que foram excluídos (opcional)
+        # df_grid = df_grid[df_grid["Aluno"].isin(nomes_alunos)].reset_index(drop=True)
+    
     else:
         # cria grid vazio
         data = {"Aluno": nomes_alunos}
