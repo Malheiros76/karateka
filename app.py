@@ -1195,8 +1195,10 @@ def pagina_exames():
         aluno = st.selectbox("Aluno", aluno_nomes)
         data = st.date_input("Data do Exame")
         belt_progression = {
-            "Branca": "Amarela",
-            "Amarela": "Laranja",
+            "Branca": "Cinza",
+            "Cinza": "Amarela",
+            "Amarela": "Vermelha",
+            "Vermelho": "Laranja",
             "Laranja": "Verde",
             "Verde": "Azul",
             "Azul": "Roxa",
