@@ -262,7 +262,7 @@ def exportar_pdf_presencas(df):
     c.drawString(50, y_pos, "Relatório de Presenças")
     y_pos -= 30
 
-    c.setFont("Helvetica", 07)
+    c.setFont("Helvetica", 7)
 
     # Dados da tabela
     for index, row in df.iterrows():
