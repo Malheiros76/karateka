@@ -202,8 +202,7 @@ def exportar_pdf_alunos():
 # FUNÇÃO PARA EXPORTAR PDF DE PRESENÇAS
 # -------------------------------------------------------
 
-def exportar_pdf_presencas(df):
-   from reportlab.pdfgen import canvas
+from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.utils import ImageReader
 import io
@@ -235,42 +234,22 @@ def exportar_pdf_presencas(df):
         st.warning(f"Erro ao carregar cabeçalho: {e}")
         y_pos = height - 50
 
-    c.setFont("Helvetica-Bold",7)
+    c.setFont("Helvetica-Bold", 10)
     c.drawString(50, y_pos, "Relatório de Presenças")
-    y_pos -= 30
-
-    c.setFont("Helvetica", 8)
-
-    for index, row in df.iterrows():
-        linha = f"{row['Aluno']}: " + " | ".join(
-            f"{col}: {row[col]}" for col in df.columns if col != "Aluno"
-        )
-        c.drawString(50, y_pos, linha)
-        y_pos -= 15
-        if y_pos < 50:
-            c.showPage()
-            y_pos = height - 50
-
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer.getvalue()
-
-
-    # TÍTULO
-    c.setFont("Helvetica-Bold",8)
-    c.drawString(50, y_pos, "Relatório de Presenças")
-    y_pos -= 30
+    y_pos -= 20
 
     c.setFont("Helvetica", 7)
 
-    # Dados da tabela
     for index, row in df.iterrows():
         linha = f"{row['Aluno']}: " + " | ".join(
             f"{col}: {row[col]}" for col in df.columns if col != "Aluno"
         )
-        c.drawString(50, y_pos, linha)
-        y_pos -= 15
+        # quebra em linhas menores, se necessário
+        max_chars = 150
+        for i in range(0, len(linha), max_chars):
+            c.drawString(50, y_pos, linha[i:i+max_chars])
+            y_pos -= 10
+
         if y_pos < 50:
             c.showPage()
             y_pos = height - 50
@@ -279,6 +258,7 @@ def exportar_pdf_presencas(df):
     c.save()
     buffer.seek(0)
     return buffer.getvalue()
+
 
 
     # -----------------------------------
