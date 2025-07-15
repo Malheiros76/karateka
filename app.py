@@ -99,7 +99,7 @@ belt_progression = {
     'Roxa': {'next': 'Marrom2', 'months': 12, 'value': 80.00},
     'Marrom2': {'next': 'Marrom1', 'months': 12, 'value': 90.00},
     'Marrom1': {'next': 'Preta', 'months': 12, 'value': 100.00},
-    'Preta': {'next': 'Preta1', 'months': 12, 'value': 110.00}
+    'Preta': {'next': 'Preta1', 'months': 24, 'value': 110.00}
 }
 
 def enviar_mensagem_whatsapp(telefone, mensagem):
@@ -444,10 +444,12 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from bson import ObjectId
+import streamlit as st
 
 MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreynsd.mongodb.net/"
 client = MongoClient(MONGO_URI)
 db = client["academia_karate"]
+
 col_usuarios = db["usuarios"]
 col_academia = db["academia"]
 col_alunos = db["alunos"]
@@ -458,35 +460,52 @@ col_equipamentos = db["equipamentos"]
 col_emprestimos = db["emprestimos"]
 col_dojo = db["dojo"]
 
-# Função para normalizar nome (tira espaços duplicados e põe tudo maiúsculo)
+# -----------------------------------------------
+# Função para normalizar nomes
+# -----------------------------------------------
 def normalizar_nome(nome):
     return re.sub(r"\s+", " ", nome).strip().upper()
 
+# -----------------------------------------------
+# Função para filtrar documentos mesmo que tenham espaços extras ou maiúsculas/minúsculas diferentes
+# -----------------------------------------------
+def filtra_por_nome(collection, nome_normalizado):
+    docs = list(collection.find())
+    return [
+        doc for doc in docs
+        if normalizar_nome(doc.get("aluno", "")) == nome_normalizado
+    ]
+
+# -----------------------------------------------
+# Função para gerar o PDF
+# -----------------------------------------------
 def gerar_pdf_relatorio_aluno(aluno_id):
+
     aluno = col_alunos.find_one({"_id": ObjectId(aluno_id)})
 
     if not aluno:
         st.error("Aluno não encontrado.")
         return
 
-    # Normaliza o nome para buscas
     nome_normalizado = normalizar_nome(aluno["nome"])
-    regex_nome = re.compile(f"^{re.escape(nome_normalizado)}$", re.IGNORECASE)
 
-    # Busca dados em todas as coleções
-    mensalidades = list(col_mensalidades.find({"aluno": regex_nome}))
-    presencas = list(col_presencas.find({"aluno": regex_nome}))
-    exames = list(col_exames.find({"aluno": regex_nome}))
-    emprestimos = list(col_emprestimos.find({"aluno": regex_nome}))
-    equipamentos = list(col_equipamentos.find({"aluno": regex_nome}))
+    # Busca dados em outras coleções
+    mensalidades = filtra_por_nome(col_mensalidades, nome_normalizado)
+    exames = filtra_por_nome(col_exames, nome_normalizado)
+    emprestimos = filtra_por_nome(col_emprestimos, nome_normalizado)
+    presencas = filtra_por_nome(col_presencas, nome_normalizado)
+    equipamentos = filtra_por_nome(col_equipamentos, nome_normalizado)
 
-    # Cria PDF
+    # Criação do PDF
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
 
-    # Cabeçalho
-    cabecalho_path = "cabecario.jpg"
-    c.drawImage(cabecalho_path, 50, 750, width=500, height=80, preserveAspectRatio=True)
+    # Cabeçalho com imagem
+    try:
+        cabecalho_path = "cabecario.jpg"   # ajuste o caminho se necessário
+        c.drawImage(cabecalho_path, 50, 750, width=500, height=80, preserveAspectRatio=True)
+    except Exception as e:
+        print(f"Erro ao carregar cabeçalho: {e}")
 
     y = 740
     c.setFont("Helvetica-Bold", 14)
@@ -519,9 +538,9 @@ def gerar_pdf_relatorio_aluno(aluno_id):
             y -= 15
             if y < 50:
                 c.showPage()
-                y = 800
+                y = 780
 
-    # Mensalidades
+    # MENSALIDADES
     escreve_titulo("Mensalidades")
     if mensalidades:
         total_pago = sum(1 for m in mensalidades if m.get("pago", False))
@@ -533,21 +552,23 @@ def gerar_pdf_relatorio_aluno(aluno_id):
         escreve_linhas([f"Total Mensalidades Pagas: {total_pago}"])
     else:
         escreve_linhas(["Nenhum registro."])
+
     y -= 10
 
-    # Presenças
+    # PRESENÇAS
     escreve_titulo("Presenças")
     if presencas:
         linhas = [
-            f"Data: {p.get('data','')}"
+            f"Data: {p.get('data')} - Aula: {p.get('aula')}"
             for p in presencas
         ]
         escreve_linhas(linhas)
     else:
         escreve_linhas(["Nenhum registro."])
+
     y -= 10
 
-    # Exames
+    # EXAMES
     escreve_titulo("Exames")
     if exames:
         linhas = [
@@ -557,9 +578,10 @@ def gerar_pdf_relatorio_aluno(aluno_id):
         escreve_linhas(linhas)
     else:
         escreve_linhas(["Nenhum registro."])
+
     y -= 10
 
-    # Empréstimos
+    # EMPRÉSTIMOS
     escreve_titulo("Empréstimos")
     if emprestimos:
         linhas = [
@@ -569,13 +591,14 @@ def gerar_pdf_relatorio_aluno(aluno_id):
         escreve_linhas(linhas)
     else:
         escreve_linhas(["Nenhum registro."])
+
     y -= 10
 
-    # Equipamentos
+    # EQUIPAMENTOS
     escreve_titulo("Equipamentos")
     if equipamentos:
         linhas = [
-            f"Equipamento: {eq.get('nome','')} - Data de Compra: {eq.get('data_compra','')}"
+            f"Equipamento: {eq.get('equipamento','')} - Código: {eq.get('codigo','')}"
             for eq in equipamentos
         ]
         escreve_linhas(linhas)
@@ -587,11 +610,10 @@ def gerar_pdf_relatorio_aluno(aluno_id):
 
     buffer.seek(0)
 
-    # Baixar PDF via link no Streamlit
+    # Gerar link para download no Streamlit
     b64_pdf = base64.b64encode(buffer.read()).decode("utf-8")
     href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="relatorio_{aluno["nome"]}.pdf">📄 Download Relatório PDF</a>'
     st.markdown(href, unsafe_allow_html=True)
-
 
 from datetime import datetime, timedelta
 import streamlit as st
@@ -1057,60 +1079,129 @@ def pagina_mensalidades():
             st.success("Mensalidade registrada!")
             st.rerun()
 
-# -------------------------------------------------------
+import pandas as pd
+from pymongo import MongoClient
+from bson import ObjectId
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+
+# ---------------------------------------------------------------
+# CONFIGURAÇÃO MONGO DB
+# ---------------------------------------------------------------
+
+MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreynsd.mongodb.net/"
+DB_NAME = "academia_karate"
+COL_ALUNOS = "alunos"
+COL_EXAMES = "exames"
+
+client = MongoClient(MONGO_URI)
+db = client[DB_NAME]
+col_alunos = db[COL_ALUNOS]
+col_exames = db[COL_EXAMES]
+
+# ---------------------------------------------------------------
+# BUSCAR DADOS DE EXAMES
+# ---------------------------------------------------------------
+
+def buscar_dados_exames():
+    exames = list(col_exames.find({}))
+    alunos = []
+    for doc in exames:
+        alunos.append({
+            "nome": doc.get("aluno", "Sem nome"),
+            "faixa": doc.get("faixa", "Sem faixa"),
+            "data_exame": doc.get("data", "Sem data"),
+            "status": doc.get("status", "Sem status"),
+        })
+    return alunos
+
+# ---------------------------------------------------------------
+# EXPORTAR PDF COM CABEÇALHO E EXAMES
+# ---------------------------------------------------------------
+
+def exportar_pdf_exames(alunos):
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+
+    width, height = A4
+    imagem_cabecalho = "cabecario.jpg"
+
+    try:
+        img = ImageReader(imagem_cabecalho)
+        img_width_px = 1208
+        img_height_px = 311
+
+        scale_factor = width / img_width_px
+        img_width_pts = width
+        img_height_pts = img_height_px * scale_factor
+
+        c.drawImage(
+            img,
+            x=0,
+            y=height - img_height_pts,
+            width=img_width_pts,
+            height=img_height_pts,
+            mask='auto'
+        )
+
+        y_pos = height - img_height_pts - 30
+
+    except Exception as e:
+        st.error(f"Erro ao carregar imagem do cabeçalho: {e}")
+        y_pos = height - 50
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, y_pos, "Relatório de Exames")
+
+    y_pos -= 30
+    c.setFont("Helvetica", 12)
+
+    if alunos:
+        for aluno in alunos:
+            texto = f"Nome: {aluno['nome']} | Faixa: {aluno['faixa']} | Data: {aluno['data_exame']} | Status: {aluno['status']}"
+            c.drawString(50, y_pos, texto)
+            y_pos -= 20
+            if y_pos < 50:
+                c.showPage()
+                y_pos = height - 50
+    else:
+        c.drawString(50, y_pos, "Nenhum exame encontrado.")
+
+    c.showPage()
+    c.save()
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf
+
+# ---------------------------------------------------------------
 # PÁGINA DE EXAMES
-# -------------------------------------------------------
+# ---------------------------------------------------------------
 
 def pagina_exames():
-    st.header("🥋 空手道 (Karatedō) - Histórico de Exames")
+    st.header("🥋 空手道 (Karatedō) - Gerenciar Exames")
 
     alunos = list(col_alunos.find())
+    st.subheader("📝 Registrar Novo Exame")
 
-    for aluno_doc in alunos:
-        exames = list(col_exames.find({"aluno": aluno_doc["nome"]}).sort("data", -1))
-        if exames:
-            ultimo = exames[0]
-
-            next_belt, data_proximo, meses_faltando, dias_faltando, valor = calcular_proximo_exame(
-                ultimo["faixa"], ultimo["data"]
-            )
-
-            if next_belt:
-                if meses_faltando > 0 or dias_faltando > 0:
-                    st.info(f"""
-                        **Aluno:** {aluno_doc["nome"]}  
-                        Último exame: {ultimo["data"]} ({ultimo["faixa"]}, {ultimo["status"]})  
-                        Próxima faixa: {next_belt}  
-                        Valor do próximo exame: R$ {valor:.2f}  
-                        Poderá fazer exame em {data_proximo.strftime("%d/%m/%Y")}  
-                        (faltam {meses_faltando} mês(es) e {dias_faltando} dia(s)).
-                    """)
-                else:
-                    st.success(f"""
-                        **Aluno:** {aluno_doc["nome"]}  
-                        Último exame: {ultimo["data"]} ({ultimo["faixa"]}, {ultimo["status"]})  
-                        Próxima faixa: {next_belt}  
-                        Valor do próximo exame: R$ {valor:.2f}  
-                        ✅ Já pode realizar o próximo exame!
-                    """)
-            else:
-                st.warning(f"""
-                    **Aluno:** {aluno_doc["nome"]}  
-                    Último exame: {ultimo["data"]} ({ultimo["faixa"]}, {ultimo["status"]})  
-                    Não há faixa seguinte cadastrada.
-                """)
-        else:
-            st.info(f"Aluno **{aluno_doc['nome']}** ainda não possui exames registrados.")
-
-    st.divider()
-
-    st.header("🥋 空手道 (Karatedō) - Registrar Novo Exame")
     with st.form("form_exame"):
         aluno_nomes = [a["nome"] for a in alunos]
         aluno = st.selectbox("Aluno", aluno_nomes)
         data = st.date_input("Data do Exame")
+        belt_progression = {
+            "Branca": "Amarela",
+            "Amarela": "Laranja",
+            "Laranja": "Verde",
+            "Verde": "Azul",
+            "Azul": "Roxa",
+            "Roxa": "Marrom",
+            "Marrom": "Preta",
+            "Preta": None
+        }
         faixa = st.selectbox("Faixa", list(belt_progression.keys()))
         status = st.selectbox("Status", ["Aprovado", "Reprovado"])
+
         if st.form_submit_button("Registrar"):
             col_exames.insert_one({
                 "aluno": aluno,
@@ -1118,12 +1209,135 @@ def pagina_exames():
                 "faixa": faixa,
                 "status": status
             })
-            st.success("Exame registrado!")
+            st.success("Exame registrado com sucesso!")
             st.rerun()
 
+    st.divider()
+
+    # -------------------------------------------------------
+    # FORMULÁRIO PARA EDITAR EXAME
+    # -------------------------------------------------------
+
+    if st.session_state.get("edit_mode"):
+        exame_id = st.session_state["edit_exame_id"]
+        exame = col_exames.find_one({"_id": ObjectId(exame_id)})
+
+        st.subheader("✏️ Alterar Exame")
+        with st.form("form_edit_exame"):
+            aluno = st.text_input("Aluno", exame["aluno"], disabled=True)
+            data = st.date_input("Data do Exame", pd.to_datetime(exame["data"]))
+
+            belt_progression = {
+                "Branca": "Amarela",
+                "Amarela": "Laranja",
+                "Laranja": "Verde",
+                "Verde": "Azul",
+                "Azul": "Roxa",
+                "Roxa": "Marrom",
+                "Marrom": "Preta",
+                "Preta": None
+            }
+
+            faixas = list(belt_progression.keys())
+            faixa_atual = exame["faixa"]
+            if faixa_atual in faixas:
+                index_faixa = faixas.index(faixa_atual)
+            else:
+                st.warning(f"⚠️ Faixa **{faixa_atual}** não encontrada. Será selecionada a primeira faixa.")
+                index_faixa = 0
+
+            faixa = st.selectbox(
+                "Faixa",
+                faixas,
+                index=index_faixa
+            )
+
+            status = st.selectbox(
+                "Status",
+                ["Aprovado", "Reprovado"],
+                index=0 if exame["status"] == "Aprovado" else 1
+            )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.form_submit_button("Salvar Alterações"):
+                    col_exames.update_one(
+                        {"_id": ObjectId(exame_id)},
+                        {"$set": {
+                            "data": str(data),
+                            "faixa": faixa,
+                            "status": status
+                        }}
+                    )
+                    st.success("Exame alterado com sucesso!")
+                    st.session_state["edit_mode"] = False
+                    st.rerun()
+            with col2:
+                if st.form_submit_button("Cancelar"):
+                    st.session_state["edit_mode"] = False
+                    st.rerun()
+
+    st.divider()
+
+    # -------------------------------------------------------
+    # EXPORTAR PDF
+    # -------------------------------------------------------
+
+    st.subheader("📄 Exportar Exames")
+
+    alunos_exames = buscar_dados_exames()
+
     if st.button("Exportar PDF de Exames"):
-        pdf_bytes = exportar_pdf_exames()
-        st.download_button("Baixar PDF", pdf_bytes, "exames.pdf", "application/pdf")
+        pdf_bytes = exportar_pdf_exames(alunos_exames)
+        st.download_button(
+            "Baixar PDF",
+            pdf_bytes,
+            file_name="exames.pdf",
+            mime="application/pdf"
+        )
+
+    st.divider()
+
+    # -------------------------------------------------------
+    # LISTAR EXAMES AGRUPADOS POR ALUNO
+    # -------------------------------------------------------
+
+    st.subheader("📚 Histórico de Exames por Aluno")
+
+    for aluno_doc in alunos:
+        exames = list(col_exames.find({"aluno": aluno_doc["nome"]}).sort("data", -1))
+
+        if exames:
+            st.markdown(f"### 👤 {aluno_doc['nome']}")
+
+            df = pd.DataFrame(exames)
+            df = df[["data", "faixa", "status"]]
+            df.columns = ["Data", "Faixa", "Status"]
+            st.table(df)
+
+            for exame in exames:
+                exame_id = str(exame["_id"])
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button(f"❌ Excluir exame {exame_id}", key=f"excluir_{exame_id}"):
+                        col_exames.delete_one({"_id": ObjectId(exame_id)})
+                        st.success("Exame excluído!")
+                        st.rerun()
+                with col2:
+                    if st.button(f"✏️ Alterar exame {exame_id}", key=f"alterar_{exame_id}"):
+                        st.session_state["edit_exame_id"] = exame_id
+                        st.session_state["edit_mode"] = True
+                        st.rerun()
+        else:
+            st.info(f"Aluno **{aluno_doc['nome']}** ainda não possui exames registrados.")
+
+# ---------------------------------------------------------------
+# CHAMA A PÁGINA
+# ---------------------------------------------------------------
+
+    pagina_exames()
+
 
 def pagina_emprestimos():
     st.title("🥋 空手道 (Karatedō) - 📦 Gerenciamento de Empréstimos")
