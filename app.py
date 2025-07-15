@@ -1343,47 +1343,103 @@ def pagina_exames():
                 if st.button(f"📄 Gerar PDF de {aluno_doc['nome']}", key=f"pdf_{aluno_doc['_id']}"):
                     buffer = io.BytesIO()
                     c = canvas.Canvas(buffer, pagesize=A4)
+                    
+                    # Definir largura e altura da página
                     width, height = A4
+                    
+                    imagem_cabecalho = "cabecario.jpg"
+                    
+                    try:
+                        # Carregar e desenhar a imagem
+                        img = ImageReader(imagem_cabecalho)
+                        img_width_px = 1208
+                        img_height_px = 311
+                    
+                        scale_factor = width / img_width_px
+                        img_width_pts = width
+                        img_height_pts = img_height_px * scale_factor
+                    
+                        c.drawImage(
+                            img,
+                            x=0,
+                            y=height - img_height_pts,
+                            width=img_width_pts,
+                            height=img_height_pts,
+                            mask='auto'
+                        )
+                    
+                        # Definir posição inicial do texto abaixo da imagem
+                        y = height - img_height_pts - 30
+                    
+                    except Exception as e:
+                        st.error(f"Erro ao carregar cabeçalho: {e}")
+                        y = height - 50  # valor padrão se imagem falhar
+                    
+                    # A partir daqui: desenhar título e conteúdo normalmente
+                    c.setFont("Helvetica-Bold", 16)
+                    c.drawString(50, y, f"Relatório de Exames - {aluno_doc['nome']}")
+                    y -= 30
+                    
+                    c.setFont("Helvetica", 12)
+                    
+                    for exame in exames:
+                        data_str = exame["data"]
+                        texto = f"Data: {data_str} | Faixa: {exame['faixa']} | Status: {exame['status']}"
+                        c.drawString(50, y, texto)
+                        y -= 20
+                        if y < 50:
+                            c.showPage()
+                            y = height - 50
+                    buffer = io.BytesIO()
+                    c = canvas.Canvas(buffer, pagesize=A4)
+                    
+                    # Definir largura e altura da página
+                    width, height = A4
+                    
+                    imagem_cabecalho = "cabecario.jpg"
+                    
+                    try:
+                        # Carregar e desenhar a imagem
+                        img = ImageReader(imagem_cabecalho)
+                        img_width_px = 1208
+                        img_height_px = 311
+                    
+                        scale_factor = width / img_width_px
+                        img_width_pts = width
+                        img_height_pts = img_height_px * scale_factor
+                    
+                        c.drawImage(
+                            img,
+                            x=0,
+                            y=height - img_height_pts,
+                            width=img_width_pts,
+                            height=img_height_pts,
+                            mask='auto'
+                        )
+                    
+                        # Definir posição inicial do texto abaixo da imagem
+                        y = height - img_height_pts - 30
+                    
+                    except Exception as e:
+                        st.error(f"Erro ao carregar cabeçalho: {e}")
+                        y = height - 50  # valor padrão se imagem falhar
+                    
+                    # A partir daqui: desenhar título e conteúdo normalmente
+                    c.setFont("Helvetica-Bold", 16)
+                    c.drawString(50, y, f"Relatório de Exames - {aluno_doc['nome']}")
+                    y -= 30
+                    
+                    c.setFont("Helvetica", 12)
+                    
+                    for exame in exames:
+                        data_str = exame["data"]
+                        texto = f"Data: {data_str} | Faixa: {exame['faixa']} | Status: {exame['status']}"
+                        c.drawString(50, y, texto)
+                        y -= 20
+                        if y < 50:
+                            c.showPage()
+                            y = height - 50
 
-                imagem_cabecalho = "cabecario.jpg"
-
-                try:
-                    img = ImageReader(imagem_cabecalho)
-                    img_width_px = 1208
-                    img_height_px = 311
-
-                    scale_factor = width / img_width_px
-                    img_width_pts = width
-                    img_height_pts = img_height_px * scale_factor
-
-                    c.drawImage(
-                        img,
-                        x=0,
-                        y=height - img_height_pts,
-                        width=img_width_pts,
-                        height=img_height_pts,
-                        mask='auto'
-                    )
-                    y = height - img_height_pts - 30
-
-                except Exception as e:
-                    st.error(f"Erro ao carregar cabeçalho: {e}")
-                    y = height - 50
-
-                c.setFont("Helvetica-Bold", 16)
-                c.drawString(50, y, f"Relatório de Exames - {aluno_doc['nome']}")
-                y -= 30
-
-                c.setFont("Helvetica", 12)
-
-                for exame in exames:
-                    data_str = exame["data"]
-                    texto = f"Data: {data_str} | Faixa: {exame['faixa']} | Status: {exame['status']}"
-                    c.drawString(50, y, texto)
-                    y -= 20
-                    if y < 50:
-                        c.showPage()
-                        y = height - 50
 
                     c.showPage()
                     c.save()
