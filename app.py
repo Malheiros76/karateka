@@ -1332,13 +1332,6 @@ def pagina_exames():
         else:
             st.info(f"Aluno **{aluno_doc['nome']}** ainda não possui exames registrados.")
 
-# ---------------------------------------------------------------
-# CHAMA A PÁGINA
-# ---------------------------------------------------------------
-
-    pagina_exames()
-
-
 def pagina_emprestimos():
     st.title("🥋 空手道 (Karatedō) - 📦 Gerenciamento de Empréstimos")
 
