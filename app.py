@@ -235,11 +235,11 @@ def exportar_pdf_presencas(df):
         st.warning(f"Erro ao carregar cabeçalho: {e}")
         y_pos = height - 50
 
-    c.setFont("Helvetica-Bold",10)
+    c.setFont("Helvetica-Bold",7)
     c.drawString(50, y_pos, "Relatório de Presenças")
     y_pos -= 30
 
-    c.setFont("Helvetica", 10)
+    c.setFont("Helvetica", 8)
 
     for index, row in df.iterrows():
         linha = f"{row['Aluno']}: " + " | ".join(
@@ -258,7 +258,7 @@ def exportar_pdf_presencas(df):
 
 
     # TÍTULO
-    c.setFont("Helvetica-Bold", 10)
+    c.setFont("Helvetica-Bold",8)
     c.drawString(50, y_pos, "Relatório de Presenças")
     y_pos -= 30
 
