@@ -202,65 +202,59 @@ def exportar_pdf_alunos():
 # FUNÇÃO PARA EXPORTAR PDF DE PRESENÇAS
 # -------------------------------------------------------
 
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.utils import ImageReader
-import io
-
 def exportar_pdf_presencas(df):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    buffer = BytesIO()
 
-    width, height = landscape(A4)
+    # Documento paisagem
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=20,
+        leftMargin=20,
+        topMargin=20,
+        bottomMargin=20
+    )
 
+    elements = []
+
+    # ----------------------------------
+    # CABEÇALHO: insere imagem completa
+    # ----------------------------------
     try:
-        img = ImageReader("cabecario.jpg")
-        img_width_px = 1208
-        img_height_px = 311
-        scale_factor = width / img_width_px
-        img_width_pts = width
-        img_height_pts = img_height_px * scale_factor
-
-        c.drawImage(
-            img,
-            x=0,
-            y=height - img_height_pts,
-            width=img_width_pts,
-            height=img_height_pts,
-            mask='auto'
-        )
-        y_pos = height - img_height_pts - 30
+        cabecalho = Image("cabecario.jpg", width=770, height=150)
+        elements.append(cabecalho)
+        elements.append(Spacer(1, 20))
     except Exception as e:
-        st.warning(f"Erro ao carregar cabeçalho: {e}")
-        y_pos = height - 50
+        print("Erro carregando cabeçalho:", e)
 
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(50, y_pos, "Relatório de Presenças")
-    y_pos -= 20
+    # ------------------------------
+    # TABELA DE PRESENÇAS
+    # ------------------------------
+    # Converte DataFrame em lista de listas
+    data = [df.columns.tolist()] + df.values.tolist()
 
-    c.setFont("Helvetica", 7)
+    table = Table(data, repeatRows=1)
 
-    for index, row in df.iterrows():
-        linha = f"{row['Aluno']}: " + " | ".join(
-            f"{col}: {row[col]}" for col in df.columns if col != "Aluno"
-        )
-        # quebra em linhas menores, se necessário
-        max_chars = 150
-        for i in range(0, len(linha), max_chars):
-            c.drawString(50, y_pos, linha[i:i+max_chars])
-            y_pos -= 10
+    style = TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.black),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("INNERGRID", (0,0), (-1,-1), 0.25, colors.black),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.black),
+        ("FONTSIZE", (0,0), (-1,-1), 4,5),
+    ])
+    table.setStyle(style)
 
-        if y_pos < 50:
-            c.showPage()
-            y_pos = height - 50
+    elements.append(table)
 
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer.getvalue()
+    # Gera PDF
+    doc.build(elements)
 
-
-
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf
+    
     # -----------------------------------
     # Buscar presenças do dia
     # -----------------------------------
