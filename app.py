@@ -202,6 +202,15 @@ def exportar_pdf_alunos():
 # FUNÇÃO PARA EXPORTAR PDF DE PRESENÇAS
 # -------------------------------------------------------
 from io import BytesIO
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Image,
+    Spacer
+)
+from reportlab.lib import colors
 def exportar_pdf_presencas(df):
     buffer = BytesIO()
 
