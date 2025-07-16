@@ -201,7 +201,7 @@ def exportar_pdf_alunos():
 # -------------------------------------------------------
 # FUNÇÃO PARA EXPORTAR PDF DE PRESENÇAS
 # -------------------------------------------------------
-
+from io import BytesIO
 def exportar_pdf_presencas(df):
     buffer = BytesIO()
 
