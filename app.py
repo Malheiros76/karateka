@@ -472,10 +472,13 @@ import re
 import io
 import base64
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from bson import ObjectId
 import streamlit as st
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import Table, TableStyle
+from reportlab.lib import colors
+
 
 MONGO_URI = "mongodb+srv://bibliotecaluizcarlos:8ax7sWrmiCMiQdGs@cluster0.rreynsd.mongodb.net/"
 client = MongoClient(MONGO_URI)
@@ -749,58 +752,62 @@ def pagina_alunos():
 
         if st.button("📥 Exportar Relação de Alunos em PDF"):
             exportar_lista_alunos_pdf()
-        def exportar_lista_alunos_pdf():
-            alunos = list(col_alunos.find().sort("nome", 1))
-        
-            if not alunos:
-                st.warning("Nenhum aluno cadastrado.")
-                return
-        
-            buffer = io.BytesIO()
-            c = canvas.Canvas(buffer, pagesize=landscape(A4))
-        
-            # Cabeçalho
-            c.setFont("Helvetica-Bold", 16)
-            c.drawString(30, 560, "Relação de Alunos Cadastrados")
-            c.setFont("Helvetica", 10)
-        
-            # Tabela
-            data = [["Nome", "RG", "Telefone", "Nascimento", "Faixa", "ID"]]
-            for a in alunos:
-                linha = [
-                    a.get("nome", ""),
-                    a.get("rg", ""),
-                    a.get("telefone", ""),
-                    a.get("data_nascimento", ""),
-                    a.get("faixa", ""),
-                    str(a["_id"])
-                ]
-                data.append(linha)
-        
-            # Estilo da tabela
-            table = Table(data, colWidths=[130, 70, 100, 80, 60, 180])
-            style = TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
-            ])
-            table.setStyle(style)
-        
-            # Geração PDF
-            table.wrapOn(c, 20, 500)
-            table.drawOn(c, 20, 80)
-        
-            c.save()
-            buffer.seek(0)
-        
-            # Link de download
-            b64 = base64.b64encode(buffer.read()).decode("utf-8")
-            href = f'<a href="data:application/pdf;base64,{b64}" download="relacao_alunos.pdf">📄 Baixar PDF com a lista de alunos</a>'
-            st.markdown(href, unsafe_allow_html=True)
+       def exportar_lista_alunos_pdf():
+    try:
+        alunos = list(col_alunos.find().sort("nome", 1))
+
+        if not alunos:
+            st.warning("Nenhum aluno cadastrado.")
+            return
+
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+
+        # Cabeçalho
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(30, 560, "Relação de Alunos Cadastrados")
+        c.setFont("Helvetica", 10)
+
+        # Tabela
+        data = [["Nome", "RG", "Telefone", "Nascimento", "Faixa", "ID"]]
+        for a in alunos:
+            linha = [
+                a.get("nome", ""),
+                a.get("rg", ""),
+                a.get("telefone", ""),
+                a.get("data_nascimento", ""),
+                a.get("faixa", ""),
+                str(a["_id"])
+            ]
+            data.append(linha)
+
+        # Estilo da tabela
+        table = Table(data, colWidths=[130, 70, 100, 80, 60, 180])
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+        ])
+        table.setStyle(style)
+
+        # Geração PDF
+        table.wrapOn(c, 20, 500)
+        table.drawOn(c, 20, 80)
+
+        c.save()
+        buffer.seek(0)
+
+        # Link de download
+        b64 = base64.b64encode(buffer.read()).decode("utf-8")
+        href = f'<a href="data:application/pdf;base64,{b64}" download="relacao_alunos.pdf">📄 Baixar PDF com a lista de alunos</a>'
+        st.markdown(href, unsafe_allow_html=True)
+    
+    except Exception as e:
+        st.error(f"Erro ao gerar PDF: {e}")
 
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
