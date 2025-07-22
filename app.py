@@ -752,10 +752,13 @@ def pagina_alunos():
      
 import io
 import base64
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.platypus import Table, TableStyle
+from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Spacer, Paragraph
 from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfgen.canvas import Canvas
+import os
 
 def exportar_lista_alunos_pdf():
     try:
@@ -766,14 +769,40 @@ def exportar_lista_alunos_pdf():
             return
 
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+        largura, altura = landscape(A4)
 
-        # Cabeçalho
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(30, 560, "Relação de Alunos Cadastrados")
-        c.setFont("Helvetica", 10)
+        caminho_cabecalho = os.path.join(os.getcwd(), "cabecario.jpeg")
 
-        # Tabela
+        # --- Função para desenhar o cabeçalho em cada página ---
+        def desenhar_cabecalho(canvas: Canvas, doc):
+            if os.path.exists(caminho_cabecalho):
+                canvas.drawImage(
+                    caminho_cabecalho,
+                    x=2 * cm,
+                    y=altura - 4 * cm,
+                    width=largura - 4 * cm,
+                    height=3.5 * cm,
+                    preserveAspectRatio=True
+                )
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            leftMargin=2 * cm,
+            rightMargin=2 * cm,
+            topMargin=5 * cm,   # espaço reservado para imagem
+            bottomMargin=2 * cm
+        )
+
+        elementos = []
+
+        # --- Título ---
+        estilos = getSampleStyleSheet()
+        titulo = Paragraph("<b>Relação de Alunos Cadastrados</b>", estilos["Title"])
+        elementos.append(titulo)
+        elementos.append(Spacer(1, 0.5 * cm))
+
+        # --- Dados da tabela ---
         data = [["Nome", "RG", "Telefone", "Nascimento", "Faixa", "ID"]]
         for a in alunos:
             linha = [
@@ -786,27 +815,26 @@ def exportar_lista_alunos_pdf():
             ]
             data.append(linha)
 
-        # Estilo da tabela
-        table = Table(data, colWidths=[130, 70, 100, 80, 60, 180])
+        col_widths = [130, 70, 100, 80, 60, 190]
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+
         style = TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey)
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ])
         table.setStyle(style)
+        elementos.append(table)
 
-        # Geração PDF
-        table.wrapOn(c, 20, 500)
-        table.drawOn(c, 20, 80)
+        # --- Construir PDF com cabeçalho em todas as páginas ---
+        doc.build(elementos, onFirstPage=desenhar_cabecalho, onLaterPages=desenhar_cabecalho)
 
-        c.save()
+        # --- Exibir botão de download ---
         buffer.seek(0)
-
-        # Link de download
         b64 = base64.b64encode(buffer.read()).decode("utf-8")
         href = f'<a href="data:application/pdf;base64,{b64}" download="relacao_alunos.pdf">📄 Baixar PDF com a lista de alunos</a>'
         st.markdown(href, unsafe_allow_html=True)
@@ -814,9 +842,6 @@ def exportar_lista_alunos_pdf():
     except Exception as e:
         st.error(f"Erro ao gerar PDF: {e}")
 
-# Botão na interface
-if st.button("📥 Exportar Relação de Alunos em PDF"):
-    exportar_lista_alunos_pdf()
 
     
 # -------------------------------------------------------
