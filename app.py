@@ -749,9 +749,7 @@ def pagina_alunos():
                 })
                 st.success("Aluno cadastrado!")
                 st.rerun()
-
-        if st.button("📥 Exportar Relação de Alunos em PDF"):
-            exportar_lista_alunos_pdf()
+     
        def exportar_lista_alunos_pdf():
     try:
         alunos = list(col_alunos.find().sort("nome", 1))
@@ -809,6 +807,8 @@ def pagina_alunos():
     except Exception as e:
         st.error(f"Erro ao gerar PDF: {e}")
 
+    if st.button("📥 Exportar Relação de Alunos em PDF"):
+            exportar_lista_alunos_pdf()
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
 # -------------------------------------------------------
