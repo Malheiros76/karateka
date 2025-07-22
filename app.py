@@ -842,9 +842,9 @@ def exportar_lista_alunos_pdf():
     except Exception as e:
         st.error(f"Erro ao gerar PDF: {e}")
 
-# Botão na interface
-if st.button("📥 Exportar Relação de Alunos em PDF"):
-    exportar_lista_alunos_pdf()
+        # Botão na interface
+        if st.button("📥 Exportar Relação de Alunos em PDF"):
+            exportar_lista_alunos_pdf()
 
     
 # -------------------------------------------------------
