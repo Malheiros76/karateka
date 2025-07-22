@@ -750,7 +750,7 @@ def pagina_alunos():
                 st.success("Aluno cadastrado!")
                 st.rerun()
      
-       def exportar_lista_alunos_pdf():
+    def exportar_lista_alunos_pdf():
     try:
         alunos = list(col_alunos.find().sort("nome", 1))
 
