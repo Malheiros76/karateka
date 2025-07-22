@@ -807,7 +807,7 @@ def pagina_alunos():
     except Exception as e:
         st.error(f"Erro ao gerar PDF: {e}")
 
-    if st.button("📥 Exportar Relação de Alunos em PDF"):
+if st.button("📥 Exportar Relação de Alunos em PDF"):
             exportar_lista_alunos_pdf()
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
