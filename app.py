@@ -771,7 +771,7 @@ def exportar_lista_alunos_pdf():
         buffer = io.BytesIO()
         largura, altura = landscape(A4)
 
-        caminho_cabecalho = os.path.join(os.getcwd(), "cabecario.jpeg")
+        caminho_cabecalho = os.path.join(os.getcwd(), "cabecario.jpg")
 
         # --- Função para desenhar o cabeçalho em cada página ---
         def desenhar_cabecalho(canvas: Canvas, doc):
@@ -790,7 +790,7 @@ def exportar_lista_alunos_pdf():
             pagesize=landscape(A4),
             leftMargin=2 * cm,
             rightMargin=2 * cm,
-            topMargin=5 * cm,   # espaço reservado para imagem
+            topMargin=15 * cm,   # espaço reservado para imagem
             bottomMargin=2 * cm
         )
 
@@ -815,7 +815,7 @@ def exportar_lista_alunos_pdf():
             ]
             data.append(linha)
 
-        col_widths = [130, 70, 100, 80, 60, 190]
+        col_widths = [270, 70, 100, 80, 60, 190]
         table = Table(data, colWidths=col_widths, repeatRows=1)
 
         style = TableStyle([
