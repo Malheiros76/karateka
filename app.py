@@ -790,7 +790,7 @@ def exportar_lista_alunos_pdf():
             pagesize=landscape(A4),
             leftMargin=2 * cm,
             rightMargin=2 * cm,
-            topMargin=15 * cm,   # espaço reservado para imagem
+            topMargin=3.5 * cm,   # espaço reservado para imagem
             bottomMargin=2 * cm
         )
 
@@ -842,6 +842,9 @@ def exportar_lista_alunos_pdf():
     except Exception as e:
         st.error(f"Erro ao gerar PDF: {e}")
 
+# Botão na interface
+if st.button("📥 Exportar Relação de Alunos em PDF"):
+    exportar_lista_alunos_pdf()
 
     
 # -------------------------------------------------------
