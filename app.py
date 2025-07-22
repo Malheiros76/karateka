@@ -750,8 +750,15 @@ def pagina_alunos():
                 st.success("Aluno cadastrado!")
                 st.rerun()
      
+import io
+import base64
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import Table, TableStyle
+from reportlab.lib import colors
+
 def exportar_lista_alunos_pdf():
-        try:
+    try:
         alunos = list(col_alunos.find().sort("nome", 1))
 
         if not alunos:
@@ -803,12 +810,15 @@ def exportar_lista_alunos_pdf():
         b64 = base64.b64encode(buffer.read()).decode("utf-8")
         href = f'<a href="data:application/pdf;base64,{b64}" download="relacao_alunos.pdf">📄 Baixar PDF com a lista de alunos</a>'
         st.markdown(href, unsafe_allow_html=True)
-    
+
     except Exception as e:
         st.error(f"Erro ao gerar PDF: {e}")
 
+# Botão na interface
 if st.button("📥 Exportar Relação de Alunos em PDF"):
-            exportar_lista_alunos_pdf()
+    exportar_lista_alunos_pdf()
+
+    
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
 # -------------------------------------------------------
