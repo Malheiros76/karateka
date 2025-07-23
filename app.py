@@ -670,7 +670,7 @@ def pagina_alunos():
             with col2:
                 if st.button(f"✏️ Editar {a['nome']}", key=f"editar_{a['_id']}"):
                     st.session_state["editar_id"] = str(a["_id"])
-                    st.experimental_rerun()
+                    st.rerun()
             with col3:
                 if st.button(f"🗑️ Excluir {a['nome']}", key=f"excluir_{a['_id']}"):
                     col_alunos.delete_one({"_id": a["_id"]})
@@ -749,7 +749,10 @@ def pagina_alunos():
                 })
                 st.success("Aluno cadastrado!")
                 st.rerun()
-     
+                # Botão na interface
+        if st.button("📥 Exportar Relação de Alunos em PDF"):
+            exportar_lista_alunos_pdf()
+
 import io
 import base64
 from reportlab.lib.pagesizes import A4, landscape
@@ -761,92 +764,88 @@ from reportlab.pdfgen.canvas import Canvas
 import os
 
 def exportar_lista_alunos_pdf():
-    try:
-        alunos = list(col_alunos.find().sort("nome", 1))
+        try:
+            alunos = list(col_alunos.find().sort("nome", 1))
 
-        if not alunos:
-            st.warning("Nenhum aluno cadastrado.")
-            return
+            if not alunos:
+                st.warning("Nenhum aluno cadastrado.")
+                return
 
-        buffer = io.BytesIO()
-        largura, altura = landscape(A4)
+            buffer = io.BytesIO()
+            largura, altura = landscape(A4)
 
-        caminho_cabecalho = os.path.join(os.getcwd(), "cabecario.jpg")
+            caminho_cabecalho = os.path.join(os.getcwd(), "cabecario.jpg")
 
-        # --- Função para desenhar o cabeçalho em cada página ---
-        def desenhar_cabecalho(canvas: Canvas, doc):
-            if os.path.exists(caminho_cabecalho):
-                canvas.drawImage(
-                    caminho_cabecalho,
-                    x=2 * cm,
-                    y=altura - 4 * cm,
-                    width=largura - 4 * cm,
-                    height=3.5 * cm,
-                    preserveAspectRatio=True
-                )
+            # --- Função para desenhar o cabeçalho em cada página ---
+            def desenhar_cabecalho(canvas: Canvas, doc):
+                if os.path.exists(caminho_cabecalho):
+                    canvas.drawImage(
+                        caminho_cabecalho,
+                        x=2 * cm,
+                        y=altura - 4 * cm,
+                        width=largura - 4 * cm,
+                        height=3.5 * cm,
+                        preserveAspectRatio=True
+                    )
 
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(A4),
-            leftMargin=2 * cm,
-            rightMargin=2 * cm,
-            topMargin=3.5 * cm,   # espaço reservado para imagem
-            bottomMargin=2 * cm
-        )
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=landscape(A4),
+                leftMargin=2 * cm,
+                rightMargin=2 * cm,
+                topMargin=5.5 * cm,   # espaço reservado para imagem
+                bottomMargin=2 * cm
+            )
 
-        elementos = []
+            elementos = []
 
-        # --- Título ---
-        estilos = getSampleStyleSheet()
-        titulo = Paragraph("<b>Relação de Alunos Cadastrados</b>", estilos["Title"])
-        elementos.append(titulo)
-        elementos.append(Spacer(1, 0.5 * cm))
+            # --- Título ---
+            estilos = getSampleStyleSheet()
+            titulo = Paragraph("<b>Relação de Alunos Cadastrados</b>", estilos["Title"])
+            elementos.append(titulo)
+            elementos.append(Spacer(1, 1.5 * cm))
 
-        # --- Dados da tabela ---
-        data = [["Nome", "RG", "Telefone", "Nascimento", "Faixa", "ID"]]
-        for a in alunos:
-            linha = [
-                a.get("nome", ""),
-                a.get("rg", ""),
-                a.get("telefone", ""),
-                a.get("data_nascimento", ""),
-                a.get("faixa", ""),
-                str(a["_id"])
-            ]
-            data.append(linha)
+            # --- Dados da tabela ---
+            data = [["Nome", "RG", "Telefone", "Nascimento", "Faixa", "ID"]]
+            for a in alunos:
+                linha = [
+                    a.get("nome", ""),
+                    a.get("rg", ""),
+                    a.get("telefone", ""),
+                    a.get("data_nascimento", ""),
+                    a.get("faixa", ""),
+                    str(a["_id"])
+                ]
+                data.append(linha)
 
-        col_widths = [270, 70, 100, 80, 60, 190]
-        table = Table(data, colWidths=col_widths, repeatRows=1)
+            col_widths = [270, 70, 100, 80, 60, 190]
+            table = Table(data, colWidths=col_widths, repeatRows=1)
 
-        style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ])
-        table.setStyle(style)
-        elementos.append(table)
+            style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ])
+            table.setStyle(style)
+            elementos.append(table)
 
-        # --- Construir PDF com cabeçalho em todas as páginas ---
-        doc.build(elementos, onFirstPage=desenhar_cabecalho, onLaterPages=desenhar_cabecalho)
+            # --- Construir PDF com cabeçalho em todas as páginas ---
+            doc.build(elementos, onFirstPage=desenhar_cabecalho, onLaterPages=desenhar_cabecalho)
 
-        # --- Exibir botão de download ---
-        buffer.seek(0)
-        b64 = base64.b64encode(buffer.read()).decode("utf-8")
-        href = f'<a href="data:application/pdf;base64,{b64}" download="relacao_alunos.pdf">📄 Baixar PDF com a lista de alunos</a>'
-        st.markdown(href, unsafe_allow_html=True)
+            # --- Exibir botão de download ---
+            buffer.seek(0)
+            b64 = base64.b64encode(buffer.read()).decode("utf-8")
+            href = f'<a href="data:application/pdf;base64,{b64}" download="relacao_alunos.pdf">📄 Baixar PDF com a lista de alunos</a>'
+            st.markdown(href, unsafe_allow_html=True)
 
-    except Exception as e:
-        st.error(f"Erro ao gerar PDF: {e}")
+        except Exception as e:
+            st.error(f"Erro ao gerar PDF: {e}")
+   
 
-        # Botão na interface
-    if st.button("📥 Exportar Relação de Alunos em PDF"):
-         exportar_lista_alunos_pdf()
-
-    
 # -------------------------------------------------------
 # PÁGINA DE PRESENÇAS
 # -------------------------------------------------------
@@ -1479,11 +1478,11 @@ def pagina_exames():
             col3, col4 = st.columns(2)
 
             #with col3:
-            #    if st.button(f"🔎 Ver relatório individual de {aluno_doc['nome']}", key=f"relatorio_{aluno_doc['_id']}"):
-            #        st.session_state["relatorio_aluno_nome"] = aluno_doc["nome"]
-            #        st.session_state["relatorio_exames"] = exames
-            #        st.session_state["show_relatorio"] = True
-            #        st.rerun()
+            if st.button(f"🔎 Ver relatório individual de {aluno_doc['nome']}", key=f"relatorio_{aluno_doc['_id']}"):
+                    st.session_state["relatorio_aluno_nome"] = aluno_doc["nome"]
+                    st.session_state["relatorio_exames"] = exames
+                    st.session_state["show_relatorio"] = True
+                    st.rerun()
 
             with col4:
                 if st.button(f"📄 Gerar PDF de {aluno_doc['nome']}", key=f"pdf_{aluno_doc['_id']}"):
@@ -1892,4 +1891,3 @@ else:
         pagina_geral()
     elif pagina == "Sistema":
         pagina_admin_system()
-
