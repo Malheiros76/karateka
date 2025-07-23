@@ -696,9 +696,9 @@ def pagina_alunos():
             rg = st.text_input("RG", value=aluno_edit.get("rg", ""))
             faixa = st.selectbox(
                 "Faixa",
-                ["Branca","cinza", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"],
+                ["Branca","cinza", "Amarela", "Vermelha", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"],
                 index=[
-                    "Branca","cinza", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"
+                    "Branca","cinza", "Amarela", "Vermelha", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"
                 ].index(aluno_edit.get("faixa", "Branca")),
             )
             data_nascimento = st.date_input(
@@ -734,7 +734,7 @@ def pagina_alunos():
             rg = st.text_input("RG")
             faixa = st.selectbox(
                 "Faixa",
-                ["Branca", "Amarela", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"]
+                ["Branca", "Amarela", "Vermelha", "Laranja", "Verde", "Azul", "Roxa", "Marrom", "Preta"]
             )
             data_nascimento = st.date_input("Data de Nascimento")
             telefone = st.text_input("Telefone/WhatsApp (com DDD)", max_chars=15)
@@ -903,7 +903,7 @@ def pagina_presencas():
             df_grid = pd.concat([df_grid, pd.DataFrame([nova_linha])], ignore_index=True)
     
         # Remove alunos que foram excluídos (opcional)
-        # df_grid = df_grid[df_grid["Aluno"].isin(nomes_alunos)].reset_index(drop=True)
+        df_grid = df_grid[df_grid["Aluno"].isin(nomes_alunos)].reset_index(drop=True)
     
     else:
         # cria grid vazio
